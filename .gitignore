@@ -21,3 +21,6 @@ tower_db-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Local test config (copy from test.example.exs)
+/config/test.exs
