@@ -27,11 +27,13 @@ defmodule TowerDB.Migration.SQLMigrator do
 
     if initial >= opts.version do
       change(migrator, initial..opts.version//-1, :down, opts)
+    else
+      :ok
     end
   end
 
   def migrated_version(opts) do
-    repo = Map.get_lazy(opts, :repo, fn -> repo() end)
+    repo = Map.get_lazy(opts, :repo, fn -> TowerDB.Repo.repo() end)
 
     query =
       from meta in "tower_db_meta",
