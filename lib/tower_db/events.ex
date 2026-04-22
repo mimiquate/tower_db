@@ -2,9 +2,11 @@ defmodule TowerDB.Events do
   alias TowerDB.Event
   alias TowerDB.Repo
 
-  def create_event(attrs) do
+  def create_event(attrs, opts \\ []) do
+    repo = Keyword.get(opts, :repo) || Repo.repo()
+
     %Event{}
     |> Event.changeset(attrs)
-    |> Repo.repo().insert()
+    |> repo.insert()
   end
 end
