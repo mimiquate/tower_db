@@ -28,6 +28,7 @@ defmodule TowerDB.MixProject do
     [
       {:tower, "~> 0.7"},
       {:ecto_sql, "~> 3.10"},
+      {:igniter, "~> 0.5", optional: true},
       {:postgrex, ">= 0.0.0", optional: true},
       {:jason, "~> 1.4", optional: true}
     ]
