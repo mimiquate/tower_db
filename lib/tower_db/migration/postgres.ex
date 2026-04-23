@@ -8,7 +8,7 @@ defmodule TowerDB.Migration.Postgres do
   alias TowerDB.Migration.SQLMigrator
 
   @initial_version 1
-  @current_version 3
+  @current_version 1
   @default_prefix "public"
 
   @impl TowerDB.Migration
