@@ -3,7 +3,7 @@ defmodule TowerDB.Event do
 
   import Ecto.Changeset
 
-  schema "events" do
+  schema "tower_db_events" do
     field :datetime, :utc_datetime_usec
     field :level, Ecto.Enum, values: [:debug, :info, :emergency, :alert, :critical, :error, :warning, :notice]
     field :reason, TowerDB.Types.Term
