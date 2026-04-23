@@ -1,21 +1,90 @@
 # TowerDB
 
-**TODO: Add description**
+A [Tower](https://github.com/mimiquate/tower) reporter that stores errors and exceptions in a PostgreSQL database using Ecto.
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `tower_db` to your list of dependencies in `mix.exs`:
+Add `tower_db` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:tower_db, "~> 0.1.0"}
+    {:tower_db, "~> 0.1.0"},
+    {:postgrex, ">= 0.0.0"}
   ]
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/tower_db>.
+## Setup
+### Manual setup
+
+Register the reporter with Tower.
+
+```elixir
+config :tower, reporters: [TowerDB]
+```
+
+Configure TowerDB to use your application's Ecto repo:
+
+```elixir
+config :tower_db, repo: MyApp.Repo
+```
+
+
+TowerDB requires database tables to store error events. Generate an Ecto migration:
+
+```bash
+mix ecto.gen.migration add_tower_db
+```
+
+Then call the `up` and `down` functions in your migration:
+
+```elixir
+defmodule MyApp.Repo.Migrations.AddTowerDB do
+  use Ecto.Migration
+
+  def up, do: TowerDB.Migration.up()
+  def down, do: TowerDB.Migration.down()
+end
+```
+
+Run the migration:
+
+```bash
+mix ecto.migrate
+```
+
+### Migration Options
+
+You can customize the migration with the following options:
+
+#### Custom Schema Prefix
+
+To use a custom PostgreSQL schema instead of `public`:
+
+```elixir
+def up, do: TowerDB.Migration.up(prefix: "tower")
+def down, do: TowerDB.Migration.down(prefix: "tower")
+```
+
+The schema will be created automatically if it doesn't exist.
+
+#### Versioned Migrations
+
+TowerDB supports incremental migrations. When no version is specified:
+- `up/0` runs all migrations up to the latest version
+- `down/0` rolls back all migrations to the initial version
+
+You can also specify a target version:
+
+```elixir
+def up, do: TowerDB.Migration.up(version: 1)
+def down, do: TowerDB.Migration.down(version: 1)
+```
+
+When upgrading, migrations run incrementally from the last applied version up to the target version. When rolling back, migrations undo from the current version down to the specified version.
+
+## License
+
+See [LICENSE](LICENSE).
 
