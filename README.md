@@ -16,6 +16,32 @@ end
 ```
 
 ## Setup
+
+### Automatic setup
+
+If you have [Igniter](https://hexdocs.pm/igniter) installed, you can run:
+
+```bash
+mix igniter.install tower_db
+```
+
+This will automatically:
+- Configure TowerDB with your Ecto repo
+- Register TowerDB as a Tower reporter
+- Generate the required database migration
+
+If you have multiple Ecto repos, specify which one to use:
+
+```bash
+mix igniter.install tower_db --repo MyApp.Repo
+```
+
+Then run the migration:
+
+```bash
+mix ecto.migrate
+```
+
 ### Manual setup
 
 Register the reporter with Tower.
