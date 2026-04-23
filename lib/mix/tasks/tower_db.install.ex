@@ -1,13 +1,17 @@
-if Code.ensure_loaded?(Igniter) do
+if Code.ensure_loaded?(Igniter) and
+     Code.ensure_loaded?(Tower.Igniter) and
+     function_exported?(Tower.Igniter, :reporters_list_append, 2) do
   defmodule Mix.Tasks.TowerDb.Install do
-    @shortdoc "Installs TowerDB. Invoke with `mix igniter.install tower_db`"
+    @example "mix igniter.install tower_db"
+
+    @shortdoc "Installs TowerDB. Invoke with `#{@example}`"
     @moduledoc """
     #{@shortdoc}
 
     ## Example
 
     ```bash
-    mix igniter.install tower_db
+    #{@example}
     ```
 
     ## Options
@@ -23,16 +27,9 @@ if Code.ensure_loaded?(Igniter) do
     def info(_argv, _composing_task) do
       %Igniter.Mix.Task.Info{
         group: :tower,
-        adds_deps: [],
-        installs: [],
-        example: "mix tower_db.install",
-        only: nil,
-        positional: [],
-        composes: [],
+        example: @example,
         schema: [repo: :string],
-        defaults: [],
-        aliases: [r: :repo],
-        required: []
+        aliases: [r: :repo]
       }
     end
 
@@ -49,14 +46,8 @@ if Code.ensure_loaded?(Igniter) do
           """
 
           igniter
-          |> Igniter.Project.Config.configure_new("config.exs", app_name, [:repo], repo)
-          |> then(fn igniter ->
-            if Code.ensure_loaded?(Tower.Igniter) do
-              Tower.Igniter.reporters_list_append(igniter, TowerDB)
-            else
-              igniter
-            end
-          end)
+          |> Igniter.Project.Config.configure_new("config.exs", :tower_db, [:repo], repo)
+          |> Tower.Igniter.reporters_list_append(TowerDB)
           |> Igniter.Project.Formatter.import_dep(:tower_db)
           |> Igniter.Libs.Ecto.gen_migration(repo, "add_tower_db",
             body: migration,
@@ -89,7 +80,19 @@ if Code.ensure_loaded?(Igniter) do
 
       case Igniter.Project.Module.module_exists(igniter, repo) do
         {true, igniter} ->
-          {:ok, repo, extract_adapter(igniter, repo)}
+          adapter = extract_adapter(igniter, repo)
+
+          if adapter in @supported_adapters do
+            {:ok, repo, adapter}
+          else
+            issue = """
+            Provided repo (#{inspect(repo)}) uses #{inspect(adapter)}.
+
+            TowerDB only supports PostgreSQL (Ecto.Adapters.Postgres).
+            """
+
+            {:error, Igniter.add_issue(igniter, issue)}
+          end
 
         {false, igniter} ->
           {:error, Igniter.add_issue(igniter, "Provided repo (#{inspect(repo)}) doesn't exist")}
@@ -97,25 +100,33 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp find_supported_repo(igniter, app_name, repos) do
-      with_adapters = Enum.map(repos, &{&1, extract_adapter(igniter, &1)})
-
-      case Enum.find(with_adapters, fn {_, adapter} -> adapter in @supported_adapters end) do
-        {repo, adapter} ->
+      repos
+      |> Enum.map(&{&1, extract_adapter(igniter, &1)})
+      |> Enum.filter(fn {_, adapter} -> adapter in @supported_adapters end)
+      |> case do
+        [{repo, adapter}] ->
           {:ok, repo, adapter}
 
-        nil ->
-          unsupported_list =
-            Enum.map_join(with_adapters, "\n", fn {repo, adapter} ->
-              "  * #{inspect(repo)} (#{inspect(adapter)})"
-            end)
-
+        [] ->
           issue = """
           No compatible Ecto repo found for #{inspect(app_name)}.
 
-          TowerDB requires PostgreSQL. Found repos with unsupported adapters:
-          #{unsupported_list}
+          TowerDB requires PostgreSQL (Ecto.Adapters.Postgres).
+          """
 
-          Specify a compatible repo explicitly with: mix tower_db.install --repo MyApp.Repo
+          {:error, Igniter.add_issue(igniter, issue)}
+
+        multiple ->
+          repo_list =
+            Enum.map_join(multiple, "\n", fn {repo, _} ->
+              "  * #{inspect(repo)}"
+            end)
+
+          issue = """
+          Multiple compatible Ecto repos found for #{inspect(app_name)}:
+          #{repo_list}
+
+          Please specify which repo to use: mix tower_db.install --repo MyApp.Repo
           """
 
           {:error, Igniter.add_issue(igniter, issue)}
@@ -136,7 +147,9 @@ if Code.ensure_loaded?(Igniter) do
   end
 else
   defmodule Mix.Tasks.TowerDb.Install do
-    @shortdoc "Installs TowerDB. Invoke with `mix igniter.install tower_db`"
+    @example "mix igniter.install tower_db"
+
+    @shortdoc "Installs TowerDB. Invoke with `#{@example}`"
 
     @moduledoc """
     #{@shortdoc}
@@ -144,7 +157,7 @@ else
     ## Example
 
     ```bash
-    mix igniter.install tower_db
+    #{@example}
     ```
     """
 
@@ -153,7 +166,9 @@ else
     @impl Mix.Task
     def run(_argv) do
       Mix.shell().error("""
-      The task 'tower_db.install' requires igniter. Please install igniter and try again.
+      The task 'tower_db.install' requires igniter and tower >= 0.8.
+
+      Please verify that those conditions are met in your project.
 
       For more information, see: https://hexdocs.pm/igniter/readme.html#installation
       """)
