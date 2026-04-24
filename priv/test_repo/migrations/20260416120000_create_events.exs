@@ -7,7 +7,7 @@ defmodule TowerDB.TestRepo.Migrations.CreateEvents do
       add :level, :string, null: false
       add :reason, :binary, null: false
       add :stacktrace, :binary
-      add :metadata, :map, default: %{}
+      add :metadata, :binary
 
       timestamps(type: :utc_datetime_usec)
     end
