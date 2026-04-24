@@ -8,7 +8,7 @@ defmodule TowerDB.Event do
     field :level, Ecto.Enum, values: [:debug, :info, :emergency, :alert, :critical, :error, :warning, :notice]
     field :reason, TowerDB.Types.Term
     field :stacktrace, TowerDB.Types.Term
-    field :metadata, :map, default: %{}
+    field :metadata, TowerDB.Types.Term
 
     timestamps(type: :utc_datetime_usec)
   end
