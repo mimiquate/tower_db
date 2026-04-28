@@ -6,7 +6,7 @@ defmodule TowerDB.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Task.Supervisor, name: TowerDB.TaskSupervisor},
+      {Task.Supervisor, name: TowerDB.TaskSupervisor, max_children: 5},
       TowerDB.Buffer
     ]
 
