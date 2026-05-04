@@ -1,5 +1,5 @@
 defmodule TowerDB.BufferTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   alias TowerDB.Buffer
 
@@ -7,14 +7,29 @@ defmodule TowerDB.BufferTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(TowerDB.TestRepo)
     Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, {:shared, self()})
 
-    # Stop the application-started Buffer to start a fresh one for each test
-    if Process.whereis(Buffer) do
-      GenServer.stop(Buffer)
-    end
+    # Ensure TaskSupervisor is running
+    task_sup =
+      case Process.whereis(TowerDB.TaskSupervisor) do
+        nil ->
+          {:ok, pid} = Task.Supervisor.start_link(name: TowerDB.TaskSupervisor, max_children: 5)
+          pid
 
-    {:ok, _pid} = Buffer.start_link()
+        pid ->
+          pid
+      end
 
-    :ok
+    # Ensure Buffer is running
+    buffer =
+      case Process.whereis(Buffer) do
+        nil ->
+          {:ok, pid} = Buffer.start_link()
+          pid
+
+        pid ->
+          pid
+      end
+
+    {:ok, buffer: buffer, task_sup: task_sup}
   end
 
   describe "basic flow" do
@@ -32,7 +47,7 @@ defmodule TowerDB.BufferTest do
       Process.sleep(100)
 
       count =
-        TowerDB.TestRepo.aggregate(TowerDB.Schema.Event, :count)
+        length(TowerDB.Events.list_events)
 
       assert count == batch_size
     end
@@ -49,13 +64,21 @@ defmodule TowerDB.BufferTest do
       Process.sleep(50)
 
       count =
-        TowerDB.TestRepo.aggregate(TowerDB.Schema.Event, :count)
+        length(TowerDB.Events.list_events)
+
 
       assert count == 0
+
+      Process.sleep(10000)
+
+      count =
+        length(TowerDB.Events.list_events)
+
+
+      assert count == 10
     end
 
     test "flushes multiple batches when queue exceeds batch size" do
-      batch_size = 50
       total_events = 120
 
       for i <- 1..total_events do
@@ -69,9 +92,16 @@ defmodule TowerDB.BufferTest do
       Process.sleep(200)
 
       count =
-        TowerDB.TestRepo.aggregate(TowerDB.Schema.Event, :count)
+        length(TowerDB.Events.list_events)
 
       assert count == 100
+
+      Process.sleep(10000)
+
+      count =
+        length(TowerDB.Events.list_events)
+
+      assert count == 120
     end
   end
 end
