@@ -40,8 +40,8 @@ defmodule TowerDB.Migration.SQLMigrator do
         where: meta.key == "migrated_version",
         select: meta.value
 
-    with true <- meta_table_exists?(repo, opts),
-         version when is_binary(version) <- repo.one(query, log: false, prefix: opts[:prefix]) do
+    with true <- meta_table_exists?(repo),
+         version when is_binary(version) <- repo.one(query, log: false) do
       String.to_integer(version)
     else
       _other -> 0
@@ -64,21 +64,19 @@ defmodule TowerDB.Migration.SQLMigrator do
 
   defp record_version(_opts, 0), do: :ok
 
-  defp record_version(opts, version) do
-    prefix = opts[:prefix]
-
+  defp record_version(_opts, version) do
     execute("""
-    INSERT INTO #{prefix}.tower_db_meta (key, value, inserted_at, updated_at)
+    INSERT INTO tower_db_meta (key, value, inserted_at, updated_at)
     VALUES ('migrated_version', '#{version}', NOW(), NOW())
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
     """)
   end
 
-  defp meta_table_exists?(repo, opts) do
+  defp meta_table_exists?(repo) do
     repo
     |> SQL.query!(
-      "SELECT TRUE FROM information_schema.tables WHERE table_name = 'tower_db_meta' AND table_schema = $1",
-      [opts.prefix],
+      "SELECT TRUE FROM information_schema.tables WHERE table_name = 'tower_db_meta' AND table_schema = 'public'",
+      [],
       log: false
     )
     |> Map.get(:rows)

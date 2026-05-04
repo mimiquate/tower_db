@@ -56,19 +56,6 @@ mix ecto.migrate
 
 ### Migration Options
 
-You can customize the migration with the following options:
-
-#### Custom Schema Prefix
-
-To use a custom PostgreSQL schema instead of `public`:
-
-```elixir
-def up, do: TowerDB.Migration.up(prefix: "tower")
-def down, do: TowerDB.Migration.down(prefix: "tower")
-```
-
-The schema will be created automatically if it doesn't exist.
-
 #### Versioned Migrations
 
 TowerDB supports incremental migrations. When no version is specified:
