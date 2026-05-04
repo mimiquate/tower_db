@@ -6,11 +6,9 @@ defmodule TowerDB.Events do
 
   def list_events(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
-    limit = Keyword.get(opts, :limit, 100)
 
     Event
     |> order_by(desc: :datetime)
-    |> limit(^limit)
     |> repo.all()
   end
 
