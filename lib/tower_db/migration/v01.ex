@@ -1,4 +1,4 @@
-defmodule TowerDB.Migration.Postgres.V01 do
+defmodule TowerDB.Migration.V01 do
   @moduledoc false
 
   use Ecto.Migration
