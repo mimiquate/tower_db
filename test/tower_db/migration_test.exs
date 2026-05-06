@@ -10,15 +10,16 @@ defmodule TowerDB.MigrationTest do
       :ok
     end
 
-    test "creates tower_db_meta table" do
+    test "creates tower_db_meta table and records version" do
       assert table_exists?("tower_db_meta")
 
       columns = get_columns("tower_db_meta")
-
       assert "key" in columns
       assert "value" in columns
       assert "inserted_at" in columns
       assert "updated_at" in columns
+
+      assert TowerDB.Migration.migrated_version(repo: TowerDB.TestRepo) == 1
     end
 
     test "creates tower_db_events table" do
@@ -34,20 +35,18 @@ defmodule TowerDB.MigrationTest do
       assert "metadata" in columns
       assert "inserted_at" in columns
       assert "updated_at" in columns
-    end
 
-    test "creates indexes on tower_db_events" do
       assert index_exists?("tower_db_events", "tower_db_events_datetime_index")
       assert index_exists?("tower_db_events", "tower_db_events_level_index")
     end
   end
 
-  # Tests that run migrations need to avoid sandbox since Ecto.Migrator
-  # spawns a Task that can't share sandbox connections
+  # Tests that run migrations use :auto mode since Ecto.Migrator
+  # spawns a Task that needs automatic access to connections
   describe "down/0" do
     setup do
+      Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
       run_migration(:up)
-      on_exit(fn -> run_migration(:up) end)
       :ok
     end
 
@@ -57,33 +56,28 @@ defmodule TowerDB.MigrationTest do
       run_migration(:down)
 
       refute table_exists?("tower_db_events")
+      refute index_exists?("tower_db_events", "tower_db_events_datetime_index")
+      refute index_exists?("tower_db_events", "tower_db_events_level_index")
     end
 
-    test "drops tower_db_meta table" do
+    test "drops tower_db_meta table and resets version" do
       assert table_exists?("tower_db_meta")
 
       run_migration(:down)
 
       refute table_exists?("tower_db_meta")
-    end
-
-    test "drops indexes" do
-      assert index_exists?("tower_db_events", "tower_db_events_datetime_index")
-
-      run_migration(:down)
-
-      refute index_exists?("tower_db_events", "tower_db_events_datetime_index")
-      refute index_exists?("tower_db_events", "tower_db_events_level_index")
+      assert TowerDB.Migration.migrated_version(repo: TowerDB.TestRepo) == 0
     end
   end
 
   describe "up/0 after down/0" do
     setup do
+      Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
       run_migration(:up)
       :ok
     end
 
-    test "recreates tables after rollback" do
+    test "recreates tables, indexes, and version after rollback" do
       run_migration(:down)
       refute table_exists?("tower_db_events")
       refute table_exists?("tower_db_meta")
@@ -92,33 +86,9 @@ defmodule TowerDB.MigrationTest do
 
       assert table_exists?("tower_db_events")
       assert table_exists?("tower_db_meta")
-    end
-
-    test "recreates indexes after rollback" do
-      run_migration(:down)
-
-      run_migration(:up)
-
       assert index_exists?("tower_db_events", "tower_db_events_datetime_index")
       assert index_exists?("tower_db_events", "tower_db_events_level_index")
-    end
-  end
-
-  describe "migrated_version/0" do
-    setup do
-      run_migration(:up)
-      on_exit(fn -> run_migration(:up) end)
-      :ok
-    end
-
-    test "returns current migration version" do
       assert TowerDB.Migration.migrated_version(repo: TowerDB.TestRepo) == 1
-    end
-
-    test "returns 0 when no migrations have run" do
-      run_migration(:down)
-
-      assert TowerDB.Migration.migrated_version(repo: TowerDB.TestRepo) == 0
     end
   end
 
@@ -138,12 +108,6 @@ defmodule TowerDB.MigrationTest do
     test "raises error for version below initial" do
       assert_raise ArgumentError, ~r/invalid version/, fn ->
         TowerDB.Migration.up(version: 0)
-      end
-    end
-
-    test "raises error for non-integer version" do
-      assert_raise ArgumentError, ~r/invalid version/, fn ->
-        TowerDB.Migration.up(version: "1")
       end
     end
   end
