@@ -1,10 +1,14 @@
 defmodule TowerDB.EventsTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
+
+  import TowerDB.TestHelpers
 
   alias TowerDB.Events
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(TowerDB.TestRepo)
+    Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
+    run_migration(:up)
+    :ok
   end
 
   describe "create_event/1" do

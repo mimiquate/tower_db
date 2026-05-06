@@ -1,12 +1,14 @@
 defmodule TowerDB.MigrationTest do
   use ExUnit.Case, async: false
 
+  import TowerDB.TestHelpers
+
   alias Ecto.Adapters.SQL
 
   describe "up/0" do
     setup do
-      :ok = Ecto.Adapters.SQL.Sandbox.checkout(TowerDB.TestRepo)
-      Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, {:shared, self()})
+      Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
+      run_migration(:up)
       :ok
     end
 
@@ -110,15 +112,6 @@ defmodule TowerDB.MigrationTest do
         TowerDB.Migration.up(version: 0)
       end
     end
-  end
-
-  defp run_migration(direction) do
-    Ecto.Migrator.run(
-      TowerDB.TestRepo,
-      [{0, TowerDB.TestRepo.Migrations.CreateEvents}],
-      direction,
-      all: true
-    )
   end
 
   defp table_exists?(table_name) do
