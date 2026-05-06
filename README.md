@@ -54,23 +54,6 @@ Run the migration:
 mix ecto.migrate
 ```
 
-### Migration Options
-
-#### Versioned Migrations
-
-TowerDB supports incremental migrations. When no version is specified:
-- `up/0` runs all migrations up to the latest version
-- `down/0` rolls back all migrations to the initial version
-
-You can also specify a target version:
-
-```elixir
-def up, do: TowerDB.Migration.up(version: 1)
-def down, do: TowerDB.Migration.down(version: 1)
-```
-
-When upgrading, migrations run incrementally from the last applied version up to the target version. When rolling back, migrations undo from the current version down to the specified version.
-
 ## License
 
 See [LICENSE](LICENSE).
