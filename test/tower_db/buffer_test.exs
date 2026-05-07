@@ -1,11 +1,12 @@
 defmodule TowerDB.BufferTest do
   use ExUnit.Case, async: false
 
+  import TowerDB.TestHelpers
+
   alias TowerDB.Buffer
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(TowerDB.TestRepo)
-    Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, {:shared, self()})
+    Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
 
     # Ensure TaskSupervisor is running
     task_sup =
@@ -18,7 +19,7 @@ defmodule TowerDB.BufferTest do
           pid
       end
 
-    # Ensure Buffer is running
+    # Ensure Buffer is running (managed by TowerDB.Application supervisor)
     buffer =
       case Process.whereis(Buffer) do
         nil ->
@@ -29,7 +30,25 @@ defmodule TowerDB.BufferTest do
           pid
       end
 
+    # Wait for any pending tasks from previous tests to complete
+    wait_for_tasks_to_complete(task_sup)
+
+    # Now safe to clean up and create fresh table
+    run_migration(:down)
+    run_migration(:up)
+
     {:ok, buffer: buffer, task_sup: task_sup}
+  end
+
+  defp wait_for_tasks_to_complete(task_sup) do
+    case Task.Supervisor.children(task_sup) do
+      [] ->
+        :ok
+
+      _children ->
+        Process.sleep(100)
+        wait_for_tasks_to_complete(task_sup)
+    end
   end
 
   describe "basic flow" do
@@ -102,6 +121,33 @@ defmodule TowerDB.BufferTest do
         length(TowerDB.Events.list_events)
 
       assert count == 120
+    end
+  end
+
+  describe "queue overflow" do
+    import ExUnit.CaptureLog
+
+    test "drops new events when queue reaches max capacity" do
+      # Start an isolated buffer with small max_queue_size and large batch_size
+      # Large batch_size ensures no automatic flushes happen
+      buffer = start_supervised!({Buffer, name: nil, max_queue_size: 10, batch_size: 100})
+
+      log =
+        capture_log(fn ->
+          # Enqueue more events than max_queue_size
+          for i <- 1..15 do
+            GenServer.cast(buffer, {:enqueue, %{
+              datetime: DateTime.utc_now(),
+              level: :error,
+              reason: %RuntimeError{message: "Error #{i}"}
+            }})
+          end
+
+          # Allow time for async casts to be processed
+          Process.sleep(50)
+        end)
+
+      assert log =~ "Buffer full, dropping new event"
     end
   end
 end

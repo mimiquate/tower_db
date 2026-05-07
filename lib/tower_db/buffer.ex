@@ -7,8 +7,16 @@ defmodule TowerDB.Buffer do
 
   require Logger
 
+  @default_config %{
+    batch_size: 50,
+    flush_timeout: 10_000,
+    max_queue_size: 1_000
+  }
+
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    {name, opts} = Keyword.pop(opts, :name, __MODULE__)
+    server_opts = if name, do: [name: name], else: []
+    GenServer.start_link(__MODULE__, opts, server_opts)
   end
 
   def enqueue(attrs) when is_map(attrs) do
@@ -16,17 +24,17 @@ defmodule TowerDB.Buffer do
   end
 
   @impl true
-  def init(_opts) do
+  def init(opts) do
+    config =
+      @default_config
+      |> Map.merge(Map.new(Keyword.take(opts, [:batch_size, :flush_timeout, :max_queue_size])))
+
     state = %{
       queue: :queue.new(),
       queue_size: 0,
       timer_ref: nil,
       batch_id: 0,
-      config: %{
-        batch_size: 50,
-        flush_timeout: 10_000,
-        max_queue_size: 1_000
-      }
+      config: config
     }
 
     {:ok, state}
@@ -34,8 +42,7 @@ defmodule TowerDB.Buffer do
 
   @impl true
   def handle_cast({:enqueue, attrs}, state) do
-
-    #drop new events if the buffer has reached its maximum capacity
+    # Drop new events if the buffer has reached its maximum capacity
     if state.queue_size >= state.config.max_queue_size do
       Logger.warning("[TowerDB] Buffer full, dropping new event")
       {:noreply, state}
