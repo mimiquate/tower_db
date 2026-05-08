@@ -9,3 +9,5 @@ config :tower_db, TowerDB.TestRepo,
 config :tower_db,
   repo: TowerDB.TestRepo,
   ecto_repos: [TowerDB.TestRepo]
+
+config :logger, level: :warning
