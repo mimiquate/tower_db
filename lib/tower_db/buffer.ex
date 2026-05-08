@@ -32,6 +32,7 @@ defmodule TowerDB.Buffer do
     state = %{
       queue: :queue.new(),
       queue_size: 0,
+      pending_batches: %{},
       timer_ref: nil,
       batch_id: 0,
       config: config
@@ -77,6 +78,32 @@ defmodule TowerDB.Buffer do
     end
   end
 
+  def handle_info({:batch_result, batch_id, :ok, count}, state) do
+    Logger.debug("[TowerDB] Inserted #{count} events")
+    {:noreply, %{state | pending_batches: Map.delete(state.pending_batches, batch_id)}}
+  end
+
+  def handle_info({:batch_result, batch_id, :error, reason}, state) do
+    Logger.error("[TowerDB] Insert failed: #{inspect(reason)}")
+
+    case Map.pop(state.pending_batches, batch_id) do
+      {nil, _} ->
+        {:noreply, state}
+
+      {events, pending_batches} ->
+        new_queue = Enum.reduce(Enum.reverse(events), state.queue, &:queue.in_r/2)
+        new_size = state.queue_size + length(events)
+
+        new_state = %{state |
+          queue: new_queue,
+          queue_size: new_size,
+          pending_batches: pending_batches
+        }
+
+        {:noreply, schedule_retry_flush(new_state)}
+    end
+  end
+
   defp do_flush(%{queue_size: 0} = state), do: state
 
   defp do_flush(state) do
@@ -85,33 +112,31 @@ defmodule TowerDB.Buffer do
     to_take =
       if queue_size >= config.batch_size, do: config.batch_size, else: queue_size
 
-    # Peek at the batch without removing from queue
-    batch = peek_from_queue(state.queue, to_take)
+    {batch, remaining_queue} = take_from_queue(state.queue, to_take)
+    buffer_pid = self()
+    batch_id = state.batch_id
 
-    task_result =
-      Task.Supervisor.start_child(TowerDB.TaskSupervisor, fn ->
+    task_result = Task.Supervisor.start_child(TowerDB.TaskSupervisor, fn ->
+      result =
         try do
-          case TowerDB.BatchInsert.insert_all(batch) do
-            {:ok, count} -> Logger.debug("[TowerDB] Inserted #{count} events")
-            {:error, reason} -> Logger.error("[TowerDB] Insert failed: #{inspect(reason)}")
-          end
+          TowerDB.BatchInsert.insert_all(batch)
         rescue
-          e -> Logger.error("[TowerDB] Insert crashed: #{Exception.message(e)}")
+          e -> {:error, e}
         end
-      end)
+
+      case result do
+        {:ok, count} -> send(buffer_pid, {:batch_result, batch_id, :ok, count})
+        {:error, reason} -> send(buffer_pid, {:batch_result, batch_id, :error, reason})
+      end
+    end)
 
     case task_result do
       {:ok, _pid} ->
-        # Task started successfully, now remove events from queue
-        {_batch, remaining_queue} = take_from_queue(state.queue, to_take)
-
-        # Cancel timer if exists
         if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
 
         remaining_size = queue_size - to_take
         new_batch_id = state.batch_id + 1
 
-        # Start new timer if there are remaining events
         new_timer_ref =
           if remaining_size > 0 do
             Process.send_after(self(), {:flush, new_batch_id}, config.flush_timeout)
@@ -122,13 +147,13 @@ defmodule TowerDB.Buffer do
         %{state |
           queue: remaining_queue,
           queue_size: remaining_size,
+          pending_batches: Map.put(state.pending_batches, batch_id, batch),
           timer_ref: new_timer_ref,
           batch_id: new_batch_id
         }
 
       {:error, :max_children} ->
-        # Max concurrent tasks reached, queue unchanged, retry later
-        Logger.debug("[TowerDB] Max concurrent flushes reached, will retry later")
+        Logger.warning("[TowerDB] Max concurrent tasks reached, will retry later")
         schedule_retry_flush(state)
     end
   end
@@ -142,19 +167,6 @@ defmodule TowerDB.Buffer do
     new_timer_ref = Process.send_after(self(), {:flush, new_batch_id}, state.config.flush_timeout)
 
     %{state | timer_ref: new_timer_ref, batch_id: new_batch_id}
-  end
-
-  defp peek_from_queue(queue, n) do
-    peek_from_queue(queue, n, [])
-  end
-
-  defp peek_from_queue(_queue, 0, acc), do: Enum.reverse(acc)
-
-  defp peek_from_queue(queue, n, acc) do
-    case :queue.out(queue) do
-      {:empty, _} -> Enum.reverse(acc)
-      {{:value, item}, rest} -> peek_from_queue(rest, n - 1, [item | acc])
-    end
   end
 
   defp take_from_queue(queue, n) do
