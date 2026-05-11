@@ -16,20 +16,6 @@ end
 ```
 
 ## Setup
-### Manual setup
-
-Register the reporter with Tower.
-
-```elixir
-config :tower, reporters: [TowerDB]
-```
-
-Configure TowerDB to use your application's Ecto repo:
-
-```elixir
-config :tower_db, repo: MyApp.Repo
-```
-
 
 TowerDB requires database tables to store error events. Generate an Ecto migration:
 
