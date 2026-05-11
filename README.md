@@ -1,21 +1,46 @@
 # TowerDB
 
-**TODO: Add description**
+A [Tower](https://github.com/mimiquate/tower) reporter that stores errors and exceptions in a PostgreSQL database using Ecto.
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `tower_db` to your list of dependencies in `mix.exs`:
+Add `tower_db` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:tower_db, "~> 0.1.0"}
+    {:tower_db, "~> 0.1.0"},
+    {:postgrex, ">= 0.0.0"}
   ]
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/tower_db>.
+## Setup
+
+TowerDB requires database tables to store error events. Generate an Ecto migration:
+
+```bash
+mix ecto.gen.migration add_tower_db
+```
+
+Then call the `up` and `down` functions in your migration:
+
+```elixir
+defmodule MyApp.Repo.Migrations.AddTowerDB do
+  use Ecto.Migration
+
+  def up, do: TowerDB.Migration.up()
+  def down, do: TowerDB.Migration.down()
+end
+```
+
+Run the migration:
+
+```bash
+mix ecto.migrate
+```
+
+## License
+
+See [LICENSE](LICENSE).
 
