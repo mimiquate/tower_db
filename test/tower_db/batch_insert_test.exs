@@ -1,17 +1,9 @@
 defmodule TowerDB.BatchInsertTest do
-  use ExUnit.Case, async: false
+  use TowerDB.DataCase, async: false
 
   import ExUnit.CaptureLog
-  import TowerDB.TestHelpers
 
   alias TowerDB.BatchInsert
-
-  setup do
-    Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
-    run_migration(:down)
-    run_migration(:up)
-    :ok
-  end
 
   describe "insert_all/1" do
     test "inserts multiple events" do

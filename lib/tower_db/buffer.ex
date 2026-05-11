@@ -20,7 +20,11 @@ defmodule TowerDB.Buffer do
   end
 
   def enqueue(attrs) when is_map(attrs) do
-    GenServer.cast(__MODULE__, {:enqueue, attrs})
+    enqueue(__MODULE__, attrs)
+  end
+
+  def enqueue(server, attrs) when is_map(attrs) do
+    GenServer.cast(server, {:enqueue, attrs})
   end
 
   @impl true

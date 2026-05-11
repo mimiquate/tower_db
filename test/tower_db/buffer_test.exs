@@ -1,62 +1,27 @@
 defmodule TowerDB.BufferTest do
-  use ExUnit.Case, async: false
-
-  import TowerDB.TestHelpers
+  use TowerDB.DataCase, async: false
 
   alias TowerDB.Buffer
 
+  @batch_size 5
+  @max_queue_size 10
+  @flush_timeout 1_000
+
   setup do
-    Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
+    buffer = start_supervised!({Buffer,
+      name: nil,
+      batch_size: @batch_size,
+      max_queue_size: @max_queue_size,
+      flush_timeout: @flush_timeout
+    })
 
-    # Ensure TaskSupervisor is running
-    task_sup =
-      case Process.whereis(TowerDB.TaskSupervisor) do
-        nil ->
-          {:ok, pid} = Task.Supervisor.start_link(name: TowerDB.TaskSupervisor, max_children: 5)
-          pid
-
-        pid ->
-          pid
-      end
-
-    # Ensure Buffer is running (managed by TowerDB.Application supervisor)
-    buffer =
-      case Process.whereis(Buffer) do
-        nil ->
-          {:ok, pid} = Buffer.start_link()
-          pid
-
-        pid ->
-          pid
-      end
-
-    # Wait for any pending tasks from previous tests to complete
-    wait_for_tasks_to_complete(task_sup)
-
-    # Now safe to clean up and create fresh table
-    run_migration(:down)
-    run_migration(:up)
-
-    {:ok, buffer: buffer, task_sup: task_sup}
-  end
-
-  defp wait_for_tasks_to_complete(task_sup) do
-    case Task.Supervisor.children(task_sup) do
-      [] ->
-        :ok
-
-      _children ->
-        Process.sleep(100)
-        wait_for_tasks_to_complete(task_sup)
-    end
+    {:ok, buffer: buffer}
   end
 
   describe "basic flow" do
-    test "flushes when batch size is reached" do
-      batch_size = 50
-
-      for i <- 1..batch_size do
-        Buffer.enqueue(%{
+    test "flushes when batch size is reached", %{buffer: buffer} do
+      for i <- 1..@batch_size do
+        Buffer.enqueue(buffer, %{
           datetime: DateTime.utc_now(),
           level: :error,
           reason: %RuntimeError{message: "Error #{i}"}
@@ -65,15 +30,14 @@ defmodule TowerDB.BufferTest do
 
       Process.sleep(100)
 
-      count =
-        length(TowerDB.Events.list_events)
-
-      assert count == batch_size
+      assert length(TowerDB.Events.list_events()) == @batch_size
     end
 
-    test "does not flush before batch size is reached" do
-      for i <- 1..10 do
-        Buffer.enqueue(%{
+    test "does not flush before batch size is reached", %{buffer: buffer} do
+      events_count = @batch_size - 2
+
+      for i <- 1..events_count do
+        Buffer.enqueue(buffer, %{
           datetime: DateTime.utc_now(),
           level: :error,
           reason: %RuntimeError{message: "Error #{i}"}
@@ -81,27 +45,17 @@ defmodule TowerDB.BufferTest do
       end
 
       Process.sleep(50)
+      assert length(TowerDB.Events.list_events()) == 0
 
-      count =
-        length(TowerDB.Events.list_events)
-
-
-      assert count == 0
-
-      Process.sleep(10000)
-
-      count =
-        length(TowerDB.Events.list_events)
-
-
-      assert count == 10
+      Process.sleep(@flush_timeout)
+      assert length(TowerDB.Events.list_events()) == events_count
     end
 
-    test "flushes multiple batches when queue exceeds batch size" do
-      total_events = 120
+    test "flushes multiple batches when queue exceeds batch size", %{buffer: buffer} do
+      total_events = @batch_size * 2 + 2
 
       for i <- 1..total_events do
-        Buffer.enqueue(%{
+        Buffer.enqueue(buffer, %{
           datetime: DateTime.utc_now(),
           level: :error,
           reason: %RuntimeError{message: "Error #{i}"}
@@ -109,18 +63,10 @@ defmodule TowerDB.BufferTest do
       end
 
       Process.sleep(200)
+      assert length(TowerDB.Events.list_events()) == @batch_size * 2
 
-      count =
-        length(TowerDB.Events.list_events)
-
-      assert count == 100
-
-      Process.sleep(10000)
-
-      count =
-        length(TowerDB.Events.list_events)
-
-      assert count == 120
+      Process.sleep(@flush_timeout + 100)
+      assert length(TowerDB.Events.list_events()) == total_events
     end
   end
 
@@ -128,22 +74,22 @@ defmodule TowerDB.BufferTest do
     import ExUnit.CaptureLog
 
     test "drops new events when queue reaches max capacity" do
-      # Start an isolated buffer with small max_queue_size and large batch_size
-      # Large batch_size ensures no automatic flushes happen
-      buffer = start_supervised!({Buffer, name: nil, max_queue_size: 10, batch_size: 100})
+      # Need large batch_size so no flush happens before overflow
+      buffer = start_supervised!(
+        {Buffer, name: nil, max_queue_size: 10, batch_size: 100},
+        id: :overflow_buffer
+      )
 
       log =
         capture_log(fn ->
-          # Enqueue more events than max_queue_size
           for i <- 1..15 do
-            GenServer.cast(buffer, {:enqueue, %{
+            Buffer.enqueue(buffer, %{
               datetime: DateTime.utc_now(),
               level: :error,
               reason: %RuntimeError{message: "Error #{i}"}
-            }})
+            })
           end
 
-          # Allow time for async casts to be processed
           Process.sleep(50)
         end)
 

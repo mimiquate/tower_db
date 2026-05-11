@@ -1,50 +1,7 @@
 defmodule TowerDB.ReporterTest do
-  use ExUnit.Case, async: false
-
-  import TowerDB.TestHelpers
+  use TowerDB.DataCase, async: false
 
   alias TowerDB.Reporter
-  alias TowerDB.Buffer
-
-  setup do
-    Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
-
-    task_sup =
-      case Process.whereis(TowerDB.TaskSupervisor) do
-        nil ->
-          {:ok, pid} = Task.Supervisor.start_link(name: TowerDB.TaskSupervisor, max_children: 5)
-          pid
-
-        pid ->
-          pid
-      end
-
-    buffer =
-      case Process.whereis(Buffer) do
-        nil ->
-          {:ok, pid} = Buffer.start_link()
-          pid
-
-        pid ->
-          pid
-      end
-
-    wait_for_tasks_to_complete(task_sup)
-
-    run_migration(:down)
-    run_migration(:up)
-
-    {:ok, buffer: buffer, task_sup: task_sup}
-  end
-
-  defp wait_for_tasks_to_complete(task_sup) do
-    case Task.Supervisor.children(task_sup) do
-      [] -> :ok
-      _children ->
-        Process.sleep(100)
-        wait_for_tasks_to_complete(task_sup)
-    end
-  end
 
   describe "report_event/1" do
     test "reports error level events" do
