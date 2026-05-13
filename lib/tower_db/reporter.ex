@@ -25,6 +25,6 @@ defmodule TowerDB.Reporter do
       metadata: event.metadata
     }
 
-    TowerDB.Buffer.enqueue(attrs)
+    TowerDB.Events.create_event(attrs)
   end
 end

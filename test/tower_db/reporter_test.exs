@@ -9,18 +9,9 @@ defmodule TowerDB.ReporterTest do
 
       assert :ok = Reporter.report_event(event)
 
-      # Fill batch to trigger flush
-      for i <- 1..49 do
-        Reporter.report_event(build_tower_event(:error, "Fill #{i}"))
-      end
-
-      Process.sleep(100)
-
       events = TowerDB.Events.list_events()
-      assert length(events) == 50
-      assert Enum.any?(events, fn e ->
-        match?(%RuntimeError{message: "Error event"}, e.reason)
-      end)
+      assert length(events) == 1
+      assert match?(%RuntimeError{message: "Error event"}, hd(events).reason)
     end
 
     test "reports critical level events" do
@@ -28,17 +19,9 @@ defmodule TowerDB.ReporterTest do
 
       assert :ok = Reporter.report_event(event)
 
-      for i <- 1..49 do
-        Reporter.report_event(build_tower_event(:error, "Fill #{i}"))
-      end
-
-      Process.sleep(100)
-
       events = TowerDB.Events.list_events()
-      assert length(events) == 50
-      assert Enum.any?(events, fn e ->
-        match?(%RuntimeError{message: "Critical event"}, e.reason)
-      end)
+      assert length(events) == 1
+      assert match?(%RuntimeError{message: "Critical event"}, hd(events).reason)
     end
 
     test "ignores warning level events" do
@@ -46,98 +29,56 @@ defmodule TowerDB.ReporterTest do
 
       assert :ok = Reporter.report_event(event)
 
-      for i <- 1..50 do
-        Reporter.report_event(build_tower_event(:error, "Error #{i}"))
-      end
-
-      Process.sleep(100)
-
       events = TowerDB.Events.list_events()
-      assert length(events) == 50
-      refute Enum.any?(events, fn e -> e.level == :warning end)
+      assert length(events) == 0
     end
 
     test "extracts all event attributes correctly" do
       stacktrace = [{__MODULE__, :test, 0, [file: ~c"test.ex", line: 1]}]
       metadata = %{request_id: "abc123", user_id: 42}
 
-      event = %Tower.Event{
-        id: "test-id",
-        similarity_id: 12345,
+      event = build_tower_event(:error, "Test error",
         datetime: ~U[2026-05-08 12:00:00.000000Z],
-        level: :error,
-        kind: :error,
-        reason: %RuntimeError{message: "Test error"},
         stacktrace: stacktrace,
-        metadata: metadata,
-        log_event: nil,
-        plug_conn: nil,
-        by: nil
-      }
+        metadata: metadata
+      )
 
       Reporter.report_event(event)
 
-      for i <- 1..49 do
-        Reporter.report_event(build_tower_event(:error, "Fill #{i}"))
-      end
+      [db_event] = TowerDB.Events.list_events()
 
-      Process.sleep(100)
-
-      events = TowerDB.Events.list_events()
-      test_event = Enum.find(events, fn e ->
-        match?(%RuntimeError{message: "Test error"}, e.reason)
-      end)
-
-      assert test_event.datetime == ~U[2026-05-08 12:00:00.000000Z]
-      assert test_event.level == :error
-      assert test_event.reason == %RuntimeError{message: "Test error"}
-      assert test_event.stacktrace == stacktrace
-      assert test_event.metadata == metadata
+      assert db_event.datetime == ~U[2026-05-08 12:00:00.000000Z]
+      assert db_event.level == :error
+      assert db_event.reason == %RuntimeError{message: "Test error"}
+      assert db_event.stacktrace == stacktrace
+      assert db_event.metadata == metadata
     end
 
     test "handles events with nil optional fields" do
-      event = %Tower.Event{
-        id: "test-id",
-        similarity_id: 12345,
-        datetime: DateTime.utc_now(),
-        level: :error,
-        kind: :error,
-        reason: %RuntimeError{message: "Nil fields"},
+      event = build_tower_event(:error, "Nil fields",
         stacktrace: nil,
-        metadata: nil,
-        log_event: nil,
-        plug_conn: nil,
-        by: nil
-      }
+        metadata: nil
+      )
 
       Reporter.report_event(event)
 
-      for i <- 1..49 do
-        Reporter.report_event(build_tower_event(:error, "Fill #{i}"))
-      end
+      [db_event] = TowerDB.Events.list_events()
 
-      Process.sleep(100)
-
-      events = TowerDB.Events.list_events()
-      test_event = Enum.find(events, fn e ->
-        match?(%RuntimeError{message: "Nil fields"}, e.reason)
-      end)
-
-      assert test_event.stacktrace == nil
-      assert test_event.metadata == nil
+      assert db_event.stacktrace == nil
+      assert db_event.metadata == nil
     end
   end
 
-  defp build_tower_event(level, message) do
+  defp build_tower_event(level, message, opts \\ []) do
     %Tower.Event{
       id: "test-#{System.unique_integer()}",
       similarity_id: :rand.uniform(100_000),
-      datetime: DateTime.utc_now(),
+      datetime: Keyword.get(opts, :datetime, DateTime.utc_now()),
       level: level,
       kind: :error,
       reason: %RuntimeError{message: message},
-      stacktrace: [{__MODULE__, :test, 0, [file: ~c"test.ex", line: 1]}],
-      metadata: %{},
+      stacktrace: Keyword.get(opts, :stacktrace, [{__MODULE__, :test, 0, [file: ~c"test.ex", line: 1]}]),
+      metadata: Keyword.get(opts, :metadata, %{}),
       log_event: nil,
       plug_conn: nil,
       by: nil
