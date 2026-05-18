@@ -2,6 +2,7 @@ defmodule TowerDB.Reporter do
   @moduledoc """
   Tower reporter that stores events in a database.
   """
+  require Logger
 
   @behaviour Tower.Reporter
 
@@ -25,6 +26,9 @@ defmodule TowerDB.Reporter do
       metadata: event.metadata
     }
 
-    TowerDB.Events.create_event(attrs)
+    case TowerDB.Events.create_event(attrs) do
+      {:ok, event} -> Logger.info("Event id: #{event.id} was inserted")
+      {:error, reason} -> Logger.error("[TowerDB] Insert failed: #{inspect(reason)}")
+    end
   end
 end

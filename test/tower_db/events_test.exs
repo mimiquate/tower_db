@@ -26,23 +26,26 @@ defmodule TowerDB.EventsTest do
     test "returns events ordered by datetime descending" do
       assert Events.list_events() == []
 
-      {:ok, _} = Events.create_event(%{
-        datetime: ~U[2026-05-08 10:00:00.000000Z],
-        level: :error,
-        reason: "first"
-      })
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          reason: "first"
+        })
 
-      {:ok, _} = Events.create_event(%{
-        datetime: ~U[2026-05-08 12:00:00.000000Z],
-        level: :error,
-        reason: "third"
-      })
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :error,
+          reason: "third"
+        })
 
-      {:ok, _} = Events.create_event(%{
-        datetime: ~U[2026-05-08 11:00:00.000000Z],
-        level: :error,
-        reason: "second"
-      })
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :error,
+          reason: "second"
+        })
 
       events = Events.list_events()
 

@@ -36,10 +36,12 @@ defmodule TowerDB.MigrationTest do
     setup do
       Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
       run_migration(:up)
+
       on_exit(fn ->
         run_migration(:up)
         Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :manual)
       end)
+
       :ok
     end
 
@@ -58,10 +60,12 @@ defmodule TowerDB.MigrationTest do
     setup do
       Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
       run_migration(:up)
+
       on_exit(fn ->
         run_migration(:up)
         Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :manual)
       end)
+
       :ok
     end
 

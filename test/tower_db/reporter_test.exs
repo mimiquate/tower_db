@@ -37,11 +37,12 @@ defmodule TowerDB.ReporterTest do
       stacktrace = [{__MODULE__, :test, 0, [file: ~c"test.ex", line: 1]}]
       metadata = %{request_id: "abc123", user_id: 42}
 
-      event = build_tower_event(:error, "Test error",
-        datetime: ~U[2026-05-08 12:00:00.000000Z],
-        stacktrace: stacktrace,
-        metadata: metadata
-      )
+      event =
+        build_tower_event(:error, "Test error",
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          stacktrace: stacktrace,
+          metadata: metadata
+        )
 
       Reporter.report_event(event)
 
@@ -55,10 +56,11 @@ defmodule TowerDB.ReporterTest do
     end
 
     test "handles events with nil optional fields" do
-      event = build_tower_event(:error, "Nil fields",
-        stacktrace: nil,
-        metadata: nil
-      )
+      event =
+        build_tower_event(:error, "Nil fields",
+          stacktrace: nil,
+          metadata: nil
+        )
 
       Reporter.report_event(event)
 
@@ -77,7 +79,8 @@ defmodule TowerDB.ReporterTest do
       level: level,
       kind: :error,
       reason: %RuntimeError{message: message},
-      stacktrace: Keyword.get(opts, :stacktrace, [{__MODULE__, :test, 0, [file: ~c"test.ex", line: 1]}]),
+      stacktrace:
+        Keyword.get(opts, :stacktrace, [{__MODULE__, :test, 0, [file: ~c"test.ex", line: 1]}]),
       metadata: Keyword.get(opts, :metadata, %{}),
       log_event: nil,
       plug_conn: nil,
