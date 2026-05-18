@@ -15,7 +15,26 @@ def deps do
 end
 ```
 
+Then fetch the dependencies:
+
+```bash
+mix deps.get
+```
+
 ## Setup
+
+Add TowerDB to your Tower reporters:
+
+```elixir
+# config/config.exs
+config :tower, reporters: [TowerDB]
+```
+
+Configure the Ecto repo that TowerDB will use to store events:
+
+```elixir
+config :tower_db, repo: MyApp.Repo
+```
 
 TowerDB requires database tables to store error events. Generate an Ecto migration:
 
@@ -23,7 +42,13 @@ TowerDB requires database tables to store error events. Generate an Ecto migrati
 mix ecto.gen.migration add_tower_db
 ```
 
-Then call the `up` and `down` functions in your migration:
+If you want to use a repo different from MyApp.Repo as its primary repo, specify it with the `-r` flag:
+
+```bash
+mix ecto.gen.migration add_tower_db -r MyApp.SecondaryRepo
+```
+
+Then add the following content to the generated migration file:
 
 ```elixir
 defmodule MyApp.Repo.Migrations.AddTowerDB do

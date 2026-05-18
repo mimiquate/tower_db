@@ -1,18 +1,14 @@
 defmodule TowerDB do
   @moduledoc """
-  Documentation for `TowerDB`.
+  A Tower reporter that persists events to a PostgreSQL database.
+
+  ## Example
+
+      config :tower, :reporters, [TowerDB]
   """
 
-  @doc """
-  Hello world.
+  @behaviour Tower.Reporter
 
-  ## Examples
-
-      iex> TowerDB.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
+  @impl true
+  defdelegate report_event(event), to: TowerDB.Reporter
 end
