@@ -40,6 +40,21 @@ Run the migration:
 mix ecto.migrate
 ```
 
+## Configuration
+
+Configure the Ecto repo that TowerDB will use to store events:
+
+```elixir
+# config/config.exs
+config :tower_db, repo: MyApp.Repo
+```
+
+Add TowerDB to your Tower reporters:
+
+```elixir
+config :tower, reporters: [TowerDB]
+```
+
 ## License
 
 See [LICENSE](LICENSE).
