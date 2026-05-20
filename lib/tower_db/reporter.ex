@@ -6,15 +6,9 @@ defmodule TowerDB.Reporter do
 
   @behaviour Tower.Reporter
 
-  @default_level :error
-
   @impl true
-  def report_event(%Tower.Event{level: level} = event) do
-    if Tower.equal_or_greater_level?(level, @default_level) do
-      do_report_event(event)
-    end
-
-    :ok
+  def report_event(%Tower.Event{} = event) do
+    do_report_event(event)
   end
 
   defp do_report_event(%Tower.Event{} = event) do
