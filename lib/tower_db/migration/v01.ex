@@ -5,11 +5,16 @@ defmodule TowerDB.Migration.V01 do
 
   def up do
     create_if_not_exists table(:tower_db_events) do
+      add :similarity_id, :bigint, null: false
       add :datetime, :utc_datetime_usec, null: false
       add :level, :string, null: false
+      add :kind, :string, null: false
       add :reason, :binary, null: false
       add :stacktrace, :binary
+      add :log_event, :binary
+      add :plug_conn, :binary
       add :metadata, :binary
+      add :by, :string
 
       timestamps(type: :utc_datetime_usec)
     end
