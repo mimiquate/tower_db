@@ -9,7 +9,8 @@ defmodule TowerDB.MixProject do
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      package: package()
     ]
   end
 
@@ -30,6 +31,14 @@ defmodule TowerDB.MixProject do
       {:ecto_sql, "~> 3.10"},
       {:postgrex, ">= 0.0.0", optional: true},
       {:jason, "~> 1.4", optional: true}
+    ]
+  end
+
+  defp package do
+    [
+      organization: "mimiquate",
+      licenses: ["Apache-2.0"],
+      links: %{}
     ]
   end
 
