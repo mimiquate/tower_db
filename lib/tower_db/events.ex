@@ -4,12 +4,28 @@ defmodule TowerDB.Events do
   alias TowerDB.Event
   alias TowerDB.Repo
 
+  @cache_table :tower_db_events_cache
+
   def list_events(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
 
-    Event
-    |> order_by(desc: :datetime)
-    |> repo.all()
+    try do
+      events =
+        Event
+        |> order_by(desc: :id)
+        |> repo.all()
+
+      # Cache successful result
+      cache_events(events)
+      events
+    rescue
+      _e ->
+        # Database unavailable, return cached events
+        get_cached_events()
+    catch
+      :exit, _reason ->
+        get_cached_events()
+    end
   end
 
   def create_event(attrs, opts \\ []) do
@@ -18,5 +34,31 @@ defmodule TowerDB.Events do
     %Event{}
     |> Event.changeset(attrs)
     |> repo.insert()
+  end
+
+  # Cache functions
+
+  defp cache_events(events) do
+    ensure_cache_table()
+    :ets.insert(@cache_table, {:events, events})
+  end
+
+  defp get_cached_events do
+    ensure_cache_table()
+
+    case :ets.lookup(@cache_table, :events) do
+      [{:events, events}] -> events
+      [] -> []
+    end
+  end
+
+  defp ensure_cache_table do
+    case :ets.info(@cache_table) do
+      :undefined ->
+        :ets.new(@cache_table, [:set, :named_table, :public, read_concurrency: true])
+
+      _ ->
+        :ok
+    end
   end
 end
