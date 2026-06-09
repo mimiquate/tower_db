@@ -34,6 +34,14 @@ defmodule TowerDB.CircuitBreaker.Storage do
   end
 
   @doc """
+  Re-queue an event at the front of the queue (preserves ordering on retry).
+  Unlike enqueue, this does not check max_size since the event was already in the queue.
+  """
+  def requeue(attrs) do
+    GenServer.call(__MODULE__, {:requeue, attrs})
+  end
+
+  @doc """
   Returns the current queue size.
   """
   def queue_size do
@@ -44,13 +52,6 @@ defmodule TowerDB.CircuitBreaker.Storage do
   end
 
   @doc """
-  Clear all queued events.
-  """
-  def clear do
-    GenServer.call(__MODULE__, :clear)
-  end
-
-  @doc """
   Get the configured max queue size.
   """
   def max_size do
@@ -58,7 +59,7 @@ defmodule TowerDB.CircuitBreaker.Storage do
   end
 
   @doc """
-  Returns stats about the queue: size, dropped count, enqueued count.
+  Returns stats about the queue: size, dropped count, enqueued and dropped count.
   """
   def state do
     GenServer.call(__MODULE__, :stats)
@@ -100,6 +101,22 @@ defmodule TowerDB.CircuitBreaker.Storage do
   end
 
   @impl true
+  def handle_call({:requeue, attrs}, _from, state) do
+    case :ets.first(state.table) do
+      :"$end_of_table" ->
+        # Queue is empty, just insert with current counter
+        counter = state.counter + 1
+        :ets.insert(state.table, {counter, attrs})
+        {:reply, :ok, %{state | counter: counter}}
+
+      min_key ->
+        # Insert before the minimum key to preserve order
+        :ets.insert(state.table, {min_key - 1, attrs})
+        {:reply, :ok, state}
+    end
+  end
+
+  @impl true
   def handle_call(:stats, _from, state) do
     stats = %{
       queue_size: :ets.info(state.table, :size),
@@ -110,12 +127,6 @@ defmodule TowerDB.CircuitBreaker.Storage do
     }
 
     {:reply, stats, state}
-  end
-
-  @impl true
-  def handle_call(:clear, _from, state) do
-    :ets.delete_all_objects(state.table)
-    {:reply, :ok, state}
   end
 
   defp config do
