@@ -21,8 +21,6 @@ defmodule TowerDB.CircuitBreaker do
         failure_threshold: 3,           # consecutive failures before opening circuit
         recovery_timeout: 5_000,        # ms before attempting recovery
         queue_retry_interval: 100,      # ms between processing queued events
-        queue_retry_attempts: 3,        # retries when processing queued events
-        queue_retry_delay: 1_000,       # ms between retries for queued events
         max_queue_size: 1000            # max queued events (configured in Storage)
   """
 
@@ -35,8 +33,6 @@ defmodule TowerDB.CircuitBreaker do
   @default_failure_threshold 3
   @default_recovery_timeout 5_000
   @default_queue_retry_interval 100
-  @default_queue_retry_attempts 3
-  @default_queue_retry_delay 1_000
 
   # Client API
 
@@ -136,22 +132,14 @@ defmodule TowerDB.CircuitBreaker do
   @impl true
   def handle_info(:try_recovery, %{state: :open} = state) do
     Logger.info("[CircuitBreaker] Attempting recovery (half-open)")
-    send(self(), :test_recovery)
-    {:noreply, %{state | state: :half_open, recovery_timer_ref: nil}}
-  end
 
-  @impl true
-  def handle_info(:try_recovery, state), do: {:noreply, state}
-
-  @impl true
-  def handle_info(:test_recovery, %{state: :half_open} = state) do
     case Storage.dequeue() do
       :empty ->
         Logger.info("[CircuitBreaker] No queued events, closing circuit")
         {:noreply, close_circuit(state)}
 
       {:ok, attrs} ->
-        case execute_with_retry(fn -> TowerDB.Events.create_event(attrs) end) do
+        case execute(fn -> TowerDB.Events.create_event(attrs) end) do
           {:ok, _event} ->
             Logger.info("[CircuitBreaker] Recovery successful, closing circuit")
             schedule_queue_processing()
@@ -159,19 +147,18 @@ defmodule TowerDB.CircuitBreaker do
 
           {:error, reason} ->
             Logger.warning("[CircuitBreaker] Recovery test failed: #{inspect(reason)}")
-            Storage.enqueue(attrs)
+            Storage.requeue(attrs)
             {:noreply, open_circuit(state)}
         end
     end
   end
 
   @impl true
-  def handle_info(:test_recovery, state), do: {:noreply, state}
+  def handle_info(:try_recovery, state), do: {:noreply, state}
 
   @impl true
   def handle_info(:process_queue, %{state: :closed} = state) do
-    process_queued_events()
-    {:noreply, state}
+    {:noreply, process_queued_events(state)}
   end
 
   @impl true
@@ -180,41 +167,15 @@ defmodule TowerDB.CircuitBreaker do
   # Private Functions
 
   defp execute(fun) do
-    try do
-      case fun.() do
-        {:ok, _} = success -> success
-        {:error, _} = error -> error
-        other ->
-          Logger.warning("[CircuitBreaker] Unexpected return value: #{inspect(other)}")
-          {:ok, other}
-      end
-    rescue
-      e -> {:error, e}
-    catch
-      :exit, reason -> {:error, {:exit, reason}}
+    case fun.() do
+      {:ok, _} = success -> success
+      {:error, _} = error -> error
+      other -> {:ok, other}
     end
-  end
-
-  defp execute_with_retry(fun) do
-    max = config(:queue_retry_attempts, @default_queue_retry_attempts)
-    delay = config(:queue_retry_delay, @default_queue_retry_delay)
-    do_execute_with_retry(fun, max, delay, 1)
-  end
-
-  defp do_execute_with_retry(fun, max, delay, attempt) do
-    case execute(fun) do
-      {:ok, _} = success ->
-        success
-
-      {:error, reason} when attempt < max ->
-        Logger.warning("[CircuitBreaker] Attempt #{attempt}/#{max} failed, retrying in #{delay}ms")
-        Process.sleep(delay)
-        do_execute_with_retry(fun, max, delay, attempt + 1)
-
-      {:error, _} = error ->
-        Logger.error("[CircuitBreaker] Failed after #{max} attempts")
-        error
-    end
+  rescue
+    e -> {:error, e}
+  catch
+    :exit, reason -> {:error, {:exit, reason}}
   end
 
   defp record_failure(state) do
@@ -247,48 +208,60 @@ defmodule TowerDB.CircuitBreaker do
   defp cancel_timer(ref), do: Process.cancel_timer(ref)
 
   defp queue_event(attrs) do
-    if db_error?(attrs) do
-      Logger.debug("[CircuitBreaker] Filtering database error - not queuing")
+    if skip_event?(attrs) do
+      Logger.debug("[CircuitBreaker] Filtering event - not queuing")
       :ok
     else
       Storage.enqueue(attrs)
     end
   end
 
-  defp db_error?(attrs) do
-    reason_str = attrs |> Map.get(:reason) |> inspect() |> String.downcase()
+  # Filter Tower reporter errors (prevents infinite loop when reporter fails)
+  defp skip_event?(%{reason: %Tower.ReportEventError{}}), do: true
+  # Filter DB-related errors (not useful to store when DB recovers)
+  defp skip_event?(%{reason: reason}) do
+    reason_str = reason |> inspect() |> String.downcase()
 
     Enum.any?(~w(dbconnection postgrex econnrefused ecto.adapters.sql), fn pattern ->
       String.contains?(reason_str, pattern)
     end)
   end
+  defp skip_event?(_), do: false
 
   defp schedule_queue_processing do
     interval = config(:queue_retry_interval, @default_queue_retry_interval)
     Process.send_after(self(), :process_queue, interval)
   end
 
-  defp process_queued_events do
+  defp process_queued_events(state) do
     case Storage.dequeue() do
       :empty ->
-        Logger.debug("[CircuitBreaker] Queue empty")
+        log_processing_summary()
+        state
 
       {:ok, attrs} ->
-        case execute_with_retry(fn -> TowerDB.Events.create_event(attrs) end) do
+        case execute(fn -> TowerDB.Events.create_event(attrs) end) do
           {:ok, event} ->
             Logger.info("[CircuitBreaker] Queued event #{event.id} inserted")
             schedule_queue_processing()
+            state
 
           {:error, _reason} ->
-            Storage.enqueue(attrs)
-            schedule_recovery_retry()
+            Logger.warning("[CircuitBreaker] Queue processing failed, re-opening circuit")
+            Storage.requeue(attrs)
+            open_circuit(state)
         end
     end
   end
 
-  defp schedule_recovery_retry do
-    timeout = config(:recovery_timeout, @default_recovery_timeout)
-    Process.send_after(self(), :process_queue, timeout)
+  defp log_processing_summary do
+    stats = Storage.state()
+
+    Logger.info(
+      "[CircuitBreaker] Queue processing complete: " <>
+      "#{stats.total_dequeued} events inserted, " <>
+      "#{stats.total_dropped} events dropped (queue was full)"
+    )
   end
 
   defp config(key, default) do
