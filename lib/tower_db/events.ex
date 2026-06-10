@@ -12,7 +12,7 @@ defmodule TowerDB.Events do
     try do
       events =
         Event
-        |> order_by(desc: :id)
+        |> order_by(desc: :datetime)
         |> repo.all()
 
       # Cache successful result
@@ -31,9 +31,16 @@ defmodule TowerDB.Events do
   def create_event(attrs, opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
 
-    %Event{}
-    |> Event.changeset(attrs)
-    |> repo.insert()
+    case %Event{}
+         |> Event.changeset(attrs)
+         |> repo.insert() do
+      {:ok, event} = result ->
+        add_event_to_cache(event)
+        result
+
+      error ->
+        error
+    end
   end
 
   # Cache functions
@@ -41,6 +48,13 @@ defmodule TowerDB.Events do
   defp cache_events(events) do
     ensure_cache_table()
     :ets.insert(@cache_table, {:events, events})
+  end
+
+  defp add_event_to_cache(event) do
+    ensure_cache_table()
+    cached = get_cached_events()
+    # Prepend new event (list is ordered by datetime desc)
+    :ets.insert(@cache_table, {:events, [event | cached]})
   end
 
   defp get_cached_events do
