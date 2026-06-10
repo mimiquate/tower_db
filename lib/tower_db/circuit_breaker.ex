@@ -243,7 +243,7 @@ defmodule TowerDB.CircuitBreaker do
       {:ok, attrs} ->
         case execute(fn -> TowerDB.Events.create_event(attrs) end) do
           {:ok, event} ->
-            Logger.info("[CircuitBreaker] Queued event #{event.id} inserted")
+            Logger.info("[CircuitBreaker] Queued event id: #{event.id} inserted")
             schedule_queue_processing()
             %{state | inserted_count: state.inserted_count + 1}
 
