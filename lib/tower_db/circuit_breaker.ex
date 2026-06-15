@@ -191,7 +191,13 @@ defmodule TowerDB.CircuitBreaker do
     end
   end
 
-  defp reset_failures(state), do: %{state | failure_count: 0}
+  defp reset_failures(state) do
+    if Storage.queue_size() > 0 do
+      schedule_queue_processing()
+    end
+
+    %{state | failure_count: 0}
+  end
 
   defp open_circuit(state) do
     cancel_timer(state.recovery_timer_ref)
@@ -213,6 +219,8 @@ defmodule TowerDB.CircuitBreaker do
       Logger.debug("[CircuitBreaker] Filtering event - not queuing")
       :ok
     else
+      Logger.info(
+      "[CircuitBreaker] Event enqueue")
       Storage.enqueue(attrs)
     end
   end
