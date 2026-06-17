@@ -2,13 +2,13 @@ defmodule TowerDB.Reporter do
   @moduledoc """
   Tower reporter that stores events in a database.
 
+  Events are buffered and flushed in batches to improve throughput.
   Uses a circuit breaker pattern to handle database failures gracefully.
-  When the database is unavailable, events are queued and retried once
+  When the database is unavailable, batches are queued and retried once
   the connection recovers.
   """
-  require Logger
 
-  alias TowerDB.CircuitBreaker
+  alias TowerDB.Buffer
 
   @behaviour Tower.Reporter
 
@@ -32,18 +32,6 @@ defmodule TowerDB.Reporter do
       metadata: event.metadata
     }
 
-    case CircuitBreaker.call(attrs, fn -> TowerDB.Events.create_event(attrs) end) do
-      {:ok, event} ->
-        Logger.info("Event id: #{event.id} was inserted")
-
-      {:queued, :circuit_open} ->
-        Logger.warning("[TowerDB] Event queued - circuit breaker open")
-
-      {:dropped, :queue_full} ->
-        Logger.error("[TowerDB] Event dropped - queue full")
-
-      {:error, reason} ->
-        Logger.error("[TowerDB] Insert failed: #{inspect(reason)}")
-    end
+    Buffer.add(attrs)
   end
 end

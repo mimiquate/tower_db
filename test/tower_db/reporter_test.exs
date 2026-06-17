@@ -6,6 +6,7 @@ defmodule TowerDB.ReporterTest do
   alias TowerDB.CircuitBreaker.Storage
 
   @processes [CircuitBreaker, Storage]
+  @flush_delay 50
 
   setup do
     stop_supervisor()
@@ -62,6 +63,7 @@ defmodule TowerDB.ReporterTest do
       event = build_tower_event(:error, "Error event")
 
       assert :ok = Reporter.report_event(event)
+      flush_and_wait()
 
       events = TowerDB.Events.list_events()
       assert length(events) == 1
@@ -72,6 +74,7 @@ defmodule TowerDB.ReporterTest do
       event = build_tower_event(:critical, "Critical event")
 
       assert :ok = Reporter.report_event(event)
+      flush_and_wait()
 
       events = TowerDB.Events.list_events()
       assert length(events) == 1
@@ -82,6 +85,7 @@ defmodule TowerDB.ReporterTest do
       event = build_tower_event(:warning, "Warning event")
 
       assert :ok = Reporter.report_event(event)
+      flush_and_wait()
 
       events = TowerDB.Events.list_events()
       assert length(events) == 0
@@ -99,6 +103,7 @@ defmodule TowerDB.ReporterTest do
         )
 
       Reporter.report_event(event)
+      flush_and_wait()
 
       [db_event] = TowerDB.Events.list_events()
 
@@ -117,12 +122,18 @@ defmodule TowerDB.ReporterTest do
         )
 
       Reporter.report_event(event)
+      flush_and_wait()
 
       [db_event] = TowerDB.Events.list_events()
 
       assert db_event.stacktrace == nil
       assert db_event.metadata == nil
     end
+  end
+
+  defp flush_and_wait do
+    Buffer.flush()
+    Process.sleep(@flush_delay)
   end
 
   defp build_tower_event(level, message, opts \\ []) do
