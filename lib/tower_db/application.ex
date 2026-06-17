@@ -8,7 +8,8 @@ defmodule TowerDB.Application do
     children = [
       # Storage must start first as it owns the ETS table
       TowerDB.CircuitBreaker.Storage,
-      TowerDB.CircuitBreaker
+      TowerDB.CircuitBreaker,
+      TowerDB.Buffer
     ]
 
     opts = [strategy: :one_for_one, name: TowerDB.Supervisor]
