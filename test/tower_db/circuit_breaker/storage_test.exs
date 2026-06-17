@@ -38,9 +38,9 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
   end
 
   describe "enqueue/1" do
-    test "enqueues multiple events" do
+    test "enqueues multiple batches" do
       for i <- 1..5 do
-        assert :ok = Storage.enqueue(%{id: i})
+        assert :ok = Storage.enqueue([%{id: i}])
       end
 
       assert Storage.queue_size() == 5
@@ -55,12 +55,12 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
       end)
 
       # Fill the queue
-      assert :ok = Storage.enqueue(%{id: 1})
-      assert :ok = Storage.enqueue(%{id: 2})
-      assert :ok = Storage.enqueue(%{id: 3})
+      assert :ok = Storage.enqueue([%{id: 1}])
+      assert :ok = Storage.enqueue([%{id: 2}])
+      assert :ok = Storage.enqueue([%{id: 3}])
 
       # This should be dropped
-      assert :dropped = Storage.enqueue(%{id: 4})
+      assert :dropped = Storage.enqueue([%{id: 4}])
       assert Storage.queue_size() == 3
     end
   end
@@ -70,36 +70,36 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
       assert :empty = Storage.dequeue()
     end
 
-    test "returns {:ok, attrs} and removes event from queue" do
-      attrs = %{reason: "test", level: :error}
-      Storage.enqueue(attrs)
+    test "returns {:ok, attrs_list} and removes batch from queue" do
+      batch = [%{reason: "test", level: :error}]
+      Storage.enqueue(batch)
 
-      assert {:ok, ^attrs} = Storage.dequeue()
+      assert {:ok, ^batch} = Storage.dequeue()
       assert Storage.queue_size() == 0
     end
 
     test "maintains FIFO order" do
-      Storage.enqueue(%{id: 1})
-      Storage.enqueue(%{id: 2})
-      Storage.enqueue(%{id: 3})
+      Storage.enqueue([%{id: 1}])
+      Storage.enqueue([%{id: 2}])
+      Storage.enqueue([%{id: 3}])
 
-      assert {:ok, %{id: 1}} = Storage.dequeue()
-      assert {:ok, %{id: 2}} = Storage.dequeue()
-      assert {:ok, %{id: 3}} = Storage.dequeue()
+      assert {:ok, [%{id: 1}]} = Storage.dequeue()
+      assert {:ok, [%{id: 2}]} = Storage.dequeue()
+      assert {:ok, [%{id: 3}]} = Storage.dequeue()
       assert :empty = Storage.dequeue()
     end
   end
 
   describe "requeue/1" do
-    test "inserts event at front of queue" do
-      Storage.enqueue(%{id: 1})
-      Storage.enqueue(%{id: 2})
+    test "inserts batch at front of queue" do
+      Storage.enqueue([%{id: 1}])
+      Storage.enqueue([%{id: 2}])
 
-      Storage.requeue(%{id: 0})
+      Storage.requeue([%{id: 0}])
 
-      assert {:ok, %{id: 0}} = Storage.dequeue()
-      assert {:ok, %{id: 1}} = Storage.dequeue()
-      assert {:ok, %{id: 2}} = Storage.dequeue()
+      assert {:ok, [%{id: 0}]} = Storage.dequeue()
+      assert {:ok, [%{id: 1}]} = Storage.dequeue()
+      assert {:ok, [%{id: 2}]} = Storage.dequeue()
     end
 
     test "does not check max_size" do
@@ -110,11 +110,11 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
       end)
 
       # Fill the queue
-      Storage.enqueue(%{id: 1})
-      Storage.enqueue(%{id: 2})
+      Storage.enqueue([%{id: 1}])
+      Storage.enqueue([%{id: 2}])
 
       # Requeue should work even though queue is full
-      assert :ok = Storage.requeue(%{id: 0})
+      assert :ok = Storage.requeue([%{id: 0}])
       assert Storage.queue_size() == 3
     end
   end
@@ -125,8 +125,8 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
     end
 
     test "returns correct count after operations" do
-      Storage.enqueue(%{id: 1})
-      Storage.enqueue(%{id: 2})
+      Storage.enqueue([%{id: 1}])
+      Storage.enqueue([%{id: 2}])
       assert Storage.queue_size() == 2
 
       Storage.dequeue()
@@ -136,8 +136,8 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
 
   describe "state/0" do
     test "tracks dequeued count" do
-      Storage.enqueue(%{id: 1})
-      Storage.enqueue(%{id: 2})
+      Storage.enqueue([%{id: 1}])
+      Storage.enqueue([%{id: 2}])
 
       stats = Storage.state()
       assert stats.total_enqueued == 2
@@ -155,9 +155,9 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
         Application.delete_env(:tower_db, :circuit_breaker)
       end)
 
-      Storage.enqueue(%{id: 1})
-      Storage.enqueue(%{id: 2})
-      Storage.enqueue(%{id: 3})
+      Storage.enqueue([%{id: 1}])
+      Storage.enqueue([%{id: 2}])
+      Storage.enqueue([%{id: 3}])
 
       stats = Storage.state()
       assert stats.total_dropped == 2

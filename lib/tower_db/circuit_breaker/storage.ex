@@ -1,6 +1,6 @@
 defmodule TowerDB.CircuitBreaker.Storage do
   @moduledoc """
-  ETS-based storage for queued events when the circuit breaker is open.
+  ETS-based storage for queued event batches when the circuit breaker is open.
 
   This GenServer owns the ETS table, ensuring the queue survives
   CircuitBreaker process restarts.
@@ -9,7 +9,7 @@ defmodule TowerDB.CircuitBreaker.Storage do
   use GenServer
 
   @table :tower_db_circuit_breaker_queue
-  @default_max_size 1000
+  @default_max_size 20
 
   # Client API
 
@@ -18,31 +18,31 @@ defmodule TowerDB.CircuitBreaker.Storage do
   end
 
   @doc """
-  Enqueue an event attrs map for later retry.
+  Enqueue a batch of event attrs for later retry.
   Returns :ok if enqueued, :dropped if queue is full.
   """
-  def enqueue(attrs) do
-    GenServer.call(__MODULE__, {:enqueue, attrs})
+  def enqueue(attrs_list) when is_list(attrs_list) do
+    GenServer.call(__MODULE__, {:enqueue, attrs_list})
   end
 
   @doc """
-  Dequeue the oldest event from the queue.
-  Returns {:ok, attrs} or :empty.
+  Dequeue the oldest batch from the queue.
+  Returns {:ok, attrs_list} or :empty.
   """
   def dequeue do
     GenServer.call(__MODULE__, :dequeue)
   end
 
   @doc """
-  Re-queue an event at the front of the queue (preserves ordering on retry).
-  Unlike enqueue, this does not check max_size since the event was already in the queue.
+  Re-queue a batch at the front of the queue (preserves ordering on retry).
+  Unlike enqueue, this does not check max_size since the batch was already in the queue.
   """
-  def requeue(attrs) do
-    GenServer.call(__MODULE__, {:requeue, attrs})
+  def requeue(attrs_list) when is_list(attrs_list) do
+    GenServer.call(__MODULE__, {:requeue, attrs_list})
   end
 
   @doc """
-  Returns the current queue size.
+  Returns the current queue size (number of batches).
   """
   def queue_size do
     case :ets.info(@table) do
@@ -74,7 +74,7 @@ defmodule TowerDB.CircuitBreaker.Storage do
   end
 
   @impl true
-  def handle_call({:enqueue, attrs}, _from, state) do
+  def handle_call({:enqueue, attrs_list}, _from, state) do
     max = max_size()
     current_size = :ets.info(state.table, :size)
 
@@ -82,7 +82,7 @@ defmodule TowerDB.CircuitBreaker.Storage do
       {:reply, :dropped, %{state | dropped: state.dropped + 1}}
     else
       counter = state.counter + 1
-      :ets.insert(state.table, {counter, attrs})
+      :ets.insert(state.table, {counter, attrs_list})
       {:reply, :ok, %{state | counter: counter, enqueued: state.enqueued + 1}}
     end
   end
@@ -94,24 +94,24 @@ defmodule TowerDB.CircuitBreaker.Storage do
         {:reply, :empty, state}
 
       key ->
-        [{^key, attrs}] = :ets.lookup(state.table, key)
+        [{^key, attrs_list}] = :ets.lookup(state.table, key)
         :ets.delete(state.table, key)
-        {:reply, {:ok, attrs}, %{state | dequeued: state.dequeued + 1}}
+        {:reply, {:ok, attrs_list}, %{state | dequeued: state.dequeued + 1}}
     end
   end
 
   @impl true
-  def handle_call({:requeue, attrs}, _from, state) do
+  def handle_call({:requeue, attrs_list}, _from, state) do
     case :ets.first(state.table) do
       :"$end_of_table" ->
         # Queue is empty, just insert with current counter
         counter = state.counter + 1
-        :ets.insert(state.table, {counter, attrs})
+        :ets.insert(state.table, {counter, attrs_list})
         {:reply, :ok, %{state | counter: counter}}
 
       min_key ->
         # Insert before the minimum key to preserve order
-        :ets.insert(state.table, {min_key - 1, attrs})
+        :ets.insert(state.table, {min_key - 1, attrs_list})
         {:reply, :ok, state}
     end
   end
