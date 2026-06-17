@@ -5,14 +5,14 @@ defmodule TowerDB.CircuitBreaker do
   Prevents cascade failures by:
   - Tracking database operation failures
   - Opening the circuit after threshold failures (stops attempting DB operations)
-  - Queuing events in ETS while circuit is open
+  - Queuing event batches in ETS while circuit is open
   - Periodically testing recovery with half-open state
-  - Processing queued events once database recovers
+  - Processing queued batches once database recovers
 
   ## States
 
-  - `:closed` - Normal operation, events go to database
-  - `:open` - Database failing, events queued in ETS
+  - `:closed` - Normal operation, batches go to database
+  - `:open` - Database failing, batches queued in ETS
   - `:half_open` - Testing if database recovered
 
   ## Configuration
@@ -20,8 +20,8 @@ defmodule TowerDB.CircuitBreaker do
       config :tower_db, :circuit_breaker,
         failure_threshold: 3,           # consecutive failures before opening circuit
         recovery_timeout: 5_000,        # ms before attempting recovery
-        queue_retry_interval: 100,      # ms between processing queued events
-        max_queue_size: 1000            # max queued events (configured in Storage)
+        queue_retry_interval: 100,      # ms between processing queued batches
+        max_queue_size: 20              # max queued batches (configured in Storage)
   """
 
   use GenServer
@@ -33,6 +33,7 @@ defmodule TowerDB.CircuitBreaker do
   @default_failure_threshold 3
   @default_recovery_timeout 5_000
   @default_queue_retry_interval 100
+  @default_batch_size 50
 
   # Client API
 
@@ -41,14 +42,14 @@ defmodule TowerDB.CircuitBreaker do
   end
 
   @doc """
-  Execute a database operation through the circuit breaker.
+  Execute a batch database operation through the circuit breaker.
 
-  - In closed state: executes the function directly, queues on failure
-  - In open state: queues the event for later retry
-  - In half-open state: tests with one operation, then decides
+  - In closed state: executes the function directly, queues batch on failure
+  - In open state: queues the batch for later retry
+  - In half-open state: tests with the batch operation, then decides
   """
-  def call(attrs, fun) when is_function(fun, 0) do
-    GenServer.call(__MODULE__, {:call, attrs, fun})
+  def call_batch(attrs_list, fun) when is_list(attrs_list) and is_function(fun, 0) do
+    GenServer.call(__MODULE__, {:call_batch, attrs_list, fun})
   end
 
   @doc """
@@ -73,7 +74,7 @@ defmodule TowerDB.CircuitBreaker do
   end
 
   @impl true
-  def handle_call({:call, attrs, fun}, _from, %{state: :closed} = state) do
+  def handle_call({:call_batch, attrs_list, fun}, _from, %{state: :closed} = state) do
     case execute(fun) do
       {:ok, result} ->
         {:reply, {:ok, result}, reset_failures(state)}
@@ -81,25 +82,25 @@ defmodule TowerDB.CircuitBreaker do
       {:error, reason} = error ->
         new_state = record_failure(state)
         Logger.warning("[CircuitBreaker] Database operation failed: #{inspect(reason)}")
-        queue_event(attrs)
+        queue_batch(attrs_list)
         {:reply, error, new_state}
     end
   end
 
   @impl true
-  def handle_call({:call, attrs, _fun}, _from, %{state: :open} = state) do
-    case queue_event(attrs) do
+  def handle_call({:call_batch, attrs_list, _fun}, _from, %{state: :open} = state) do
+    case queue_batch(attrs_list) do
       :ok ->
         {:reply, {:queued, :circuit_open}, state}
 
       :dropped ->
-        Logger.warning("[CircuitBreaker] Event dropped - queue full")
+        Logger.warning("[CircuitBreaker] Batch dropped - queue full")
         {:reply, {:dropped, :queue_full}, state}
     end
   end
 
   @impl true
-  def handle_call({:call, attrs, fun}, _from, %{state: :half_open} = state) do
+  def handle_call({:call_batch, attrs_list, fun}, _from, %{state: :half_open} = state) do
     case execute(fun) do
       {:ok, result} ->
         Logger.info("[CircuitBreaker] Database recovered, closing circuit")
@@ -109,7 +110,7 @@ defmodule TowerDB.CircuitBreaker do
 
       {:error, reason} = error ->
         Logger.warning("[CircuitBreaker] Recovery test failed: #{inspect(reason)}")
-        queue_event(attrs)
+        queue_batch(attrs_list)
         {:reply, error, open_circuit(state)}
     end
   end
@@ -135,20 +136,20 @@ defmodule TowerDB.CircuitBreaker do
 
     case Storage.dequeue() do
       :empty ->
-        Logger.info("[CircuitBreaker] No queued events, closing circuit")
+        Logger.info("[CircuitBreaker] No queued batches, closing circuit")
         {:noreply, close_circuit(state)}
 
-      {:ok, attrs} ->
-        case execute(fn -> TowerDB.Events.create_event(attrs) end) do
-          {:ok, _event} ->
+      {:ok, attrs_list} ->
+        case execute(fn -> TowerDB.Events.create_events_batch(attrs_list) end) do
+          {:ok, events} ->
             Logger.info("[CircuitBreaker] Recovery successful, closing circuit")
             schedule_queue_processing()
             new_state = close_circuit(state)
-            {:noreply, %{new_state | inserted_count: new_state.inserted_count + 1}}
+            {:noreply, %{new_state | inserted_count: new_state.inserted_count + length(events)}}
 
           {:error, reason} ->
             Logger.warning("[CircuitBreaker] Recovery test failed: #{inspect(reason)}")
-            Storage.requeue(attrs)
+            Storage.requeue(attrs_list)
             {:noreply, open_circuit(state)}
         end
     end
@@ -159,7 +160,7 @@ defmodule TowerDB.CircuitBreaker do
 
   @impl true
   def handle_info(:process_queue, %{state: :closed} = state) do
-    {:noreply, process_queued_events(state)}
+    {:noreply, process_queued_batches(state)}
   end
 
   @impl true
@@ -214,14 +215,15 @@ defmodule TowerDB.CircuitBreaker do
   defp cancel_timer(nil), do: :ok
   defp cancel_timer(ref), do: Process.cancel_timer(ref)
 
-  defp queue_event(attrs) do
-    if skip_event?(attrs) do
-      Logger.debug("[CircuitBreaker] Filtering event - not queuing")
+  defp queue_batch(attrs_list) do
+    filtered = Enum.reject(attrs_list, &skip_event?/1)
+
+    if Enum.empty?(filtered) do
+      Logger.debug("[CircuitBreaker] All events filtered - not queuing batch")
       :ok
     else
-      Logger.info(
-      "[CircuitBreaker] Event enqueue")
-      Storage.enqueue(attrs)
+      Logger.info("[CircuitBreaker] Batch enqueue (#{length(filtered)} events)")
+      Storage.enqueue(filtered)
     end
   end
 
@@ -242,22 +244,22 @@ defmodule TowerDB.CircuitBreaker do
     Process.send_after(self(), :process_queue, interval)
   end
 
-  defp process_queued_events(state) do
+  defp process_queued_batches(state) do
     case Storage.dequeue() do
       :empty ->
         log_processing_summary(state.inserted_count)
         %{state | inserted_count: 0}
 
-      {:ok, attrs} ->
-        case execute(fn -> TowerDB.Events.create_event(attrs) end) do
-          {:ok, event} ->
-            Logger.info("[CircuitBreaker] Queued event id: #{event.id} inserted")
+      {:ok, attrs_list} ->
+        case execute(fn -> TowerDB.Events.create_events_batch(attrs_list) end) do
+          {:ok, events} ->
+            Logger.info("[CircuitBreaker] Queued batch inserted (#{length(events)} events)")
             schedule_queue_processing()
-            %{state | inserted_count: state.inserted_count + 1}
+            %{state | inserted_count: state.inserted_count + length(events)}
 
           {:error, _reason} ->
             Logger.warning("[CircuitBreaker] Queue processing failed, re-opening circuit")
-            Storage.requeue(attrs)
+            Storage.requeue(attrs_list)
             open_circuit(state)
         end
     end
@@ -265,16 +267,22 @@ defmodule TowerDB.CircuitBreaker do
 
   defp log_processing_summary(inserted_count) do
     stats = Storage.state()
+    batch_size = buffer_config(:batch_size, @default_batch_size)
 
     Logger.info(
       "[CircuitBreaker] Queue processing complete: " <>
       "#{inserted_count} events inserted, " <>
-      "#{stats.total_dropped} events dropped (queue was full)"
+      "#{stats.total_dropped} batches dropped (each batch has up to #{batch_size} events)"
     )
   end
 
   defp config(key, default) do
     Application.get_env(:tower_db, :circuit_breaker, [])
+    |> Keyword.get(key, default)
+  end
+
+  defp buffer_config(key, default) do
+    Application.get_env(:tower_db, :buffer, [])
     |> Keyword.get(key, default)
   end
 end
