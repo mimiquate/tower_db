@@ -59,7 +59,7 @@ defmodule TowerDB.CircuitBreaker.Storage do
   end
 
   @doc """
-  Returns stats about the queue: size, dropped count, enqueued and dropped count.
+  Returns stats about the queue: batch count, and event counts (enqueued, dequeued, dropped).
   """
   def state do
     GenServer.call(__MODULE__, :stats)
@@ -77,13 +77,14 @@ defmodule TowerDB.CircuitBreaker.Storage do
   def handle_call({:enqueue, attrs_list}, _from, state) do
     max = max_size()
     current_size = :ets.info(state.table, :size)
+    event_count = length(attrs_list)
 
     if current_size >= max do
-      {:reply, :dropped, %{state | dropped: state.dropped + 1}}
+      {:reply, :dropped, %{state | dropped: state.dropped + event_count}}
     else
       counter = state.counter + 1
       :ets.insert(state.table, {counter, attrs_list})
-      {:reply, :ok, %{state | counter: counter, enqueued: state.enqueued + 1}}
+      {:reply, :ok, %{state | counter: counter, enqueued: state.enqueued + event_count}}
     end
   end
 
@@ -96,7 +97,7 @@ defmodule TowerDB.CircuitBreaker.Storage do
       key ->
         [{^key, attrs_list}] = :ets.lookup(state.table, key)
         :ets.delete(state.table, key)
-        {:reply, {:ok, attrs_list}, %{state | dequeued: state.dequeued + 1}}
+        {:reply, {:ok, attrs_list}, %{state | dequeued: state.dequeued + length(attrs_list)}}
     end
   end
 
@@ -119,11 +120,11 @@ defmodule TowerDB.CircuitBreaker.Storage do
   @impl true
   def handle_call(:stats, _from, state) do
     stats = %{
-      queue_size: :ets.info(state.table, :size),
-      max_size: max_size(),
-      total_enqueued: state.enqueued,
-      total_dequeued: state.dequeued,
-      total_dropped: state.dropped
+      batch_count: :ets.info(state.table, :size),
+      max_batch_count: max_size(),
+      events_enqueued: state.enqueued,
+      events_dequeued: state.dequeued,
+      events_dropped: state.dropped
     }
 
     {:reply, stats, state}

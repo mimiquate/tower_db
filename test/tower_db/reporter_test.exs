@@ -2,18 +2,26 @@ defmodule TowerDB.ReporterTest do
   use TowerDB.DataCase, async: false
 
   alias TowerDB.Reporter
+  alias TowerDB.Buffer
   alias TowerDB.CircuitBreaker
   alias TowerDB.CircuitBreaker.Storage
 
-  @processes [CircuitBreaker, Storage]
+  @processes [Buffer, CircuitBreaker, Storage]
   @flush_delay 50
 
   setup do
     stop_supervisor()
     stop_processes(@processes)
 
+    # Ensure the cache table exists (may have been deleted if supervisor stopped)
+    case :ets.info(:tower_db_events_cache) do
+      :undefined -> :ets.new(:tower_db_events_cache, [:set, :named_table, :public, read_concurrency: true])
+      _ -> :ok
+    end
+
     {:ok, _} = Storage.start_link()
     {:ok, _} = CircuitBreaker.start_link()
+    {:ok, _} = Buffer.start_link()
 
     on_exit(fn ->
       safe_call(CircuitBreaker, :reset)

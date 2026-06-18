@@ -33,7 +33,6 @@ defmodule TowerDB.CircuitBreaker do
   @default_failure_threshold 3
   @default_recovery_timeout 5_000
   @default_queue_retry_interval 100
-  @default_batch_size 50
 
   # Client API
 
@@ -267,22 +266,16 @@ defmodule TowerDB.CircuitBreaker do
 
   defp log_processing_summary(inserted_count) do
     stats = Storage.state()
-    batch_size = buffer_config(:batch_size, @default_batch_size)
 
     Logger.info(
       "[CircuitBreaker] Queue processing complete: " <>
       "#{inserted_count} events inserted, " <>
-      "#{stats.total_dropped} batches dropped (each batch has up to #{batch_size} events)"
+      "#{stats.events_dropped} events dropped"
     )
   end
 
   defp config(key, default) do
     Application.get_env(:tower_db, :circuit_breaker, [])
-    |> Keyword.get(key, default)
-  end
-
-  defp buffer_config(key, default) do
-    Application.get_env(:tower_db, :buffer, [])
     |> Keyword.get(key, default)
   end
 end

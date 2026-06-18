@@ -135,32 +135,36 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
   end
 
   describe "state/0" do
-    test "tracks dequeued count" do
+    test "tracks enqueued and dequeued event counts" do
+      # Each batch has 1 event
       Storage.enqueue([%{id: 1}])
       Storage.enqueue([%{id: 2}])
 
       stats = Storage.state()
-      assert stats.total_enqueued == 2
+      assert stats.events_enqueued == 2
 
       Storage.dequeue()
 
       stats = Storage.state()
-      assert stats.total_dequeued == 1
+      assert stats.events_dequeued == 1
     end
 
-    test "tracks dropped count" do
+    test "tracks dropped event count" do
       Application.put_env(:tower_db, :circuit_breaker, max_queue_size: 1)
 
       on_exit(fn ->
         Application.delete_env(:tower_db, :circuit_breaker)
       end)
 
+      # First batch (1 event) - enqueued
       Storage.enqueue([%{id: 1}])
+      # Second batch (1 event) - dropped
       Storage.enqueue([%{id: 2}])
-      Storage.enqueue([%{id: 3}])
+      # Third batch (2 events) - dropped
+      Storage.enqueue([%{id: 3}, %{id: 4}])
 
       stats = Storage.state()
-      assert stats.total_dropped == 2
+      assert stats.events_dropped == 3
     end
   end
 end
