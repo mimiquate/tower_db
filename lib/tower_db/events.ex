@@ -71,36 +71,22 @@ defmodule TowerDB.Events do
     end
   end
 
-  # Cache functions
+  # Cache functions (ETS table created in application.ex)
 
   defp cache_events(events) do
-    ensure_cache_table()
     :ets.insert(@cache_table, {:events, events})
   end
 
   defp add_event_to_cache(event) do
-    ensure_cache_table()
     cached = get_cached_events()
     # Prepend new event (list is ordered by datetime desc)
     :ets.insert(@cache_table, {:events, [event | cached]})
   end
 
   defp get_cached_events do
-    ensure_cache_table()
-
     case :ets.lookup(@cache_table, :events) do
       [{:events, events}] -> events
       [] -> []
-    end
-  end
-
-  defp ensure_cache_table do
-    case :ets.info(@cache_table) do
-      :undefined ->
-        :ets.new(@cache_table, [:set, :named_table, :public, read_concurrency: true])
-
-      _ ->
-        :ok
     end
   end
 end
