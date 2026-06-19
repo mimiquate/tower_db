@@ -41,14 +41,14 @@ defmodule TowerDB.CircuitBreaker do
   end
 
   @doc """
-  Execute a batch database operation through the circuit breaker.
+  Execute a batch database operation through the circuit breaker (non-blocking).
 
   - In closed state: executes the function directly, queues batch on failure
   - In open state: queues the batch for later retry
   - In half-open state: tests with the batch operation, then decides
   """
   def call_batch(attrs_list, fun) when is_list(attrs_list) and is_function(fun, 0) do
-    GenServer.call(__MODULE__, {:call_batch, attrs_list, fun})
+    GenServer.cast(__MODULE__, {:call_batch, attrs_list, fun})
   end
 
   @doc """
@@ -65,6 +65,24 @@ defmodule TowerDB.CircuitBreaker do
     GenServer.call(__MODULE__, :reset)
   end
 
+  @doc """
+  Check if the circuit breaker can accept new batches.
+  Returns true if circuit is closed OR (circuit is open/half-open AND queue has space).
+  """
+  def can_accept? do
+    cb_state = state()
+    queue_stats = Storage.state()
+
+    case cb_state.state do
+      :closed ->
+        true
+
+      _open_or_half_open ->
+        # Accept if queue has space (leave some buffer room)
+        queue_stats.batch_count < queue_stats.max_batch_count
+    end
+  end
+
   # Server Callbacks
 
   @impl true
@@ -73,44 +91,44 @@ defmodule TowerDB.CircuitBreaker do
   end
 
   @impl true
-  def handle_call({:call_batch, attrs_list, fun}, _from, %{state: :closed} = state) do
+  def handle_cast({:call_batch, attrs_list, fun}, %{state: :closed} = state) do
     case execute(fun) do
-      {:ok, result} ->
-        {:reply, {:ok, result}, reset_failures(state)}
+      {:ok, _result} ->
+        {:noreply, reset_failures(state)}
 
-      {:error, reason} = error ->
+      {:error, reason} ->
         new_state = record_failure(state)
         Logger.warning("[CircuitBreaker] Database operation failed: #{inspect(reason)}")
         queue_batch(attrs_list)
-        {:reply, error, new_state}
+        {:noreply, new_state}
     end
   end
 
   @impl true
-  def handle_call({:call_batch, attrs_list, _fun}, _from, %{state: :open} = state) do
+  def handle_cast({:call_batch, attrs_list, _fun}, %{state: :open} = state) do
     case queue_batch(attrs_list) do
       :ok ->
-        {:reply, {:queued, :circuit_open}, state}
+        {:noreply, state}
 
       :dropped ->
         Logger.warning("[CircuitBreaker] Batch dropped - queue full")
-        {:reply, {:dropped, :queue_full}, state}
+        {:noreply, state}
     end
   end
 
   @impl true
-  def handle_call({:call_batch, attrs_list, fun}, _from, %{state: :half_open} = state) do
+  def handle_cast({:call_batch, attrs_list, fun}, %{state: :half_open} = state) do
     case execute(fun) do
-      {:ok, result} ->
+      {:ok, _result} ->
         Logger.info("[CircuitBreaker] Database recovered, closing circuit")
         new_state = close_circuit(state)
         schedule_queue_processing()
-        {:reply, {:ok, result}, new_state}
+        {:noreply, new_state}
 
-      {:error, reason} = error ->
+      {:error, reason} ->
         Logger.warning("[CircuitBreaker] Recovery test failed: #{inspect(reason)}")
         queue_batch(attrs_list)
-        {:reply, error, open_circuit(state)}
+        {:noreply, open_circuit(state)}
     end
   end
 
@@ -131,25 +149,28 @@ defmodule TowerDB.CircuitBreaker do
 
   @impl true
   def handle_info(:try_recovery, %{state: :open} = state) do
-    Logger.info("[CircuitBreaker] Attempting recovery (half-open)")
+    Logger.info("[CircuitBreaker] Transitioning to half-open state")
+    new_state = half_open_circuit(state)
 
+    # If there are queued batches, test recovery immediately with one
     case Storage.dequeue() do
       :empty ->
-        Logger.info("[CircuitBreaker] No queued batches, closing circuit")
-        {:noreply, close_circuit(state)}
+        # No queued batches, wait for next call_batch to test
+        Logger.info("[CircuitBreaker] No queued batches, waiting for next request to test recovery")
+        {:noreply, new_state}
 
       {:ok, attrs_list} ->
         case execute(fn -> TowerDB.Events.create_events_batch(attrs_list) end) do
           {:ok, events} ->
             Logger.info("[CircuitBreaker] Recovery successful, closing circuit")
             schedule_queue_processing()
-            new_state = close_circuit(state)
-            {:noreply, %{new_state | inserted_count: new_state.inserted_count + length(events)}}
+            closed_state = close_circuit(new_state)
+            {:noreply, %{closed_state | inserted_count: closed_state.inserted_count + length(events)}}
 
           {:error, reason} ->
             Logger.warning("[CircuitBreaker] Recovery test failed: #{inspect(reason)}")
             Storage.requeue(attrs_list)
-            {:noreply, open_circuit(state)}
+            {:noreply, open_circuit(new_state)}
         end
     end
   end
@@ -209,6 +230,11 @@ defmodule TowerDB.CircuitBreaker do
   defp close_circuit(state) do
     cancel_timer(state.recovery_timer_ref)
     %{state | state: :closed, failure_count: 0, recovery_timer_ref: nil}
+  end
+
+  defp half_open_circuit(state) do
+    cancel_timer(state.recovery_timer_ref)
+    %{state | state: :half_open, recovery_timer_ref: nil}
   end
 
   defp cancel_timer(nil), do: :ok

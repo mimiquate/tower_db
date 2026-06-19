@@ -21,6 +21,7 @@ defmodule TowerDB.Buffer do
 
   @default_batch_size 50
   @default_flush_interval 500
+  @default_backpressure_retry 1000
 
   # Client API
 
@@ -99,6 +100,11 @@ defmodule TowerDB.Buffer do
     {:noreply, do_flush(%{state | flush_timer_ref: nil})}
   end
 
+  @impl true
+  def handle_info(:retry_flush, state) do
+    {:noreply, do_flush(%{state | flush_timer_ref: nil})}
+  end
+
   # Private Functions
 
   defp do_flush(%{buffer: []} = state) do
@@ -108,16 +114,23 @@ defmodule TowerDB.Buffer do
 
   defp do_flush(state) do
     cancel_timer(state.flush_timer_ref)
+
+    if CircuitBreaker.can_accept?() do
+      flush_to_circuit_breaker(state)
+    else
+      Logger.info("[Buffer] CircuitBreaker not ready, holding #{length(state.buffer)} events")
+      schedule_retry(state)
+    end
+  end
+
+  defp flush_to_circuit_breaker(state) do
     events = Enum.reverse(state.buffer)
     event_count = length(events)
 
     Logger.info("[Buffer] Flushing batch (#{event_count} events)")
 
-    # Flush asynchronously to avoid blocking the buffer process
-    Task.start(fn ->
-      CircuitBreaker.call_batch(events, fn ->
-        TowerDB.Events.create_events_batch(events)
-      end)
+    CircuitBreaker.call_batch(events, fn ->
+      TowerDB.Events.create_events_batch(events)
     end)
 
     %{state |
@@ -125,6 +138,12 @@ defmodule TowerDB.Buffer do
       flush_timer_ref: nil,
       total_flushed: state.total_flushed + event_count
     }
+  end
+
+  defp schedule_retry(state) do
+    retry_interval = config(:backpressure_retry, @default_backpressure_retry)
+    ref = Process.send_after(self(), :retry_flush, retry_interval)
+    %{state | flush_timer_ref: ref}
   end
 
   defp ensure_timer(%{flush_timer_ref: nil} = state) do
