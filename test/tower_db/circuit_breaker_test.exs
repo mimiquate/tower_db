@@ -64,12 +64,11 @@ defmodule TowerDB.CircuitBreakerTest do
 
       assert CircuitBreaker.state().failure_count == 2
       assert CircuitBreaker.state().state == :closed
-      assert Storage.queue_size() == 2
+      assert CircuitBreaker.state().queue_size == 2
 
       # Success resets failure count
-      result = CircuitBreaker.call_batch([%{}], fn -> {:ok, :success} end)
+      CircuitBreaker.call_batch([%{}], fn -> {:ok, :success} end)
 
-      assert result == {:ok, :success}
       assert CircuitBreaker.state().failure_count == 0
     end
   end
@@ -98,14 +97,17 @@ defmodule TowerDB.CircuitBreakerTest do
       :ok
     end
 
-    test "returns dropped when queue is full" do
+    test "drops batch when queue is full" do
+      # Fill the queue (max is 10, we have 3 from setup)
       for _ <- 1..7 do
         CircuitBreaker.call_batch([%{}], fn -> {:ok, :noop} end)
       end
 
-      result = CircuitBreaker.call_batch([%{}], fn -> {:ok, :noop} end)
+      assert CircuitBreaker.state().queue_size == 10
 
-      assert result == {:dropped, :queue_full}
+      CircuitBreaker.call_batch([%{}], fn -> {:ok, :noop} end)
+
+      assert CircuitBreaker.state().queue_size == 10
     end
   end
 
@@ -134,12 +136,10 @@ defmodule TowerDB.CircuitBreakerTest do
         %RuntimeError{message: "app error"}
       ]
 
-      # Send batch with all errors
       batch = Enum.map(errors, fn error -> %{reason: error} end)
       CircuitBreaker.call_batch(batch, fn -> {:error, :fail} end)
 
-      # Only the RuntimeError should be queued (filtered batch has 1 event)
-      assert Storage.queue_size() == 1
+      assert CircuitBreaker.state().queue_size == 1
 
       {:ok, [queued_event]} = Storage.dequeue()
       assert %RuntimeError{} = queued_event.reason

@@ -46,8 +46,7 @@ defmodule TowerDB.Events do
   @doc """
   Insert multiple events in a single transaction using Ecto.Multi.
 
-  Returns `{:ok, events_list}` on success or `{:error, changeset}` on failure.
-  The entire batch is atomic - either all events are inserted or none.
+  Returns `{:ok, count}` on success or `{:error, changeset}` on failure.
   """
   def create_events_batch(attrs_list, opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
@@ -62,9 +61,7 @@ defmodule TowerDB.Events do
 
     case repo.transaction(multi) do
       {:ok, results} ->
-        events = results |> Map.values() |> Enum.sort_by(& &1.datetime, {:desc, DateTime})
-        Enum.each(events, &add_event_to_cache/1)
-        {:ok, events}
+        {:ok, map_size(results)}
 
       {:error, _failed_op, changeset, _changes} ->
         {:error, changeset}

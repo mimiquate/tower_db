@@ -161,11 +161,11 @@ defmodule TowerDB.CircuitBreaker do
 
       {:ok, attrs_list} ->
         case execute(fn -> TowerDB.Events.create_events_batch(attrs_list) end) do
-          {:ok, events} ->
+          {:ok, count} ->
             Logger.info("[CircuitBreaker] Recovery successful, closing circuit")
             schedule_queue_processing()
             closed_state = close_circuit(new_state)
-            {:noreply, %{closed_state | inserted_count: closed_state.inserted_count + length(events)}}
+            {:noreply, %{closed_state | inserted_count: closed_state.inserted_count + count}}
 
           {:error, reason} ->
             Logger.warning("[CircuitBreaker] Recovery test failed: #{inspect(reason)}")
@@ -277,10 +277,10 @@ defmodule TowerDB.CircuitBreaker do
 
       {:ok, attrs_list} ->
         case execute(fn -> TowerDB.Events.create_events_batch(attrs_list) end) do
-          {:ok, events} ->
-            Logger.info("[CircuitBreaker] Queued batch inserted (#{length(events)} events)")
+          {:ok, count} ->
+            Logger.info("[CircuitBreaker] Queued batch inserted (#{count} events)")
             schedule_queue_processing()
-            %{state | inserted_count: state.inserted_count + length(events)}
+            %{state | inserted_count: state.inserted_count + count}
 
           {:error, _reason} ->
             Logger.warning("[CircuitBreaker] Queue processing failed, re-opening circuit")
@@ -289,6 +289,8 @@ defmodule TowerDB.CircuitBreaker do
         end
     end
   end
+
+  defp log_processing_summary(0), do: :ok
 
   defp log_processing_summary(inserted_count) do
     stats = Storage.state()
