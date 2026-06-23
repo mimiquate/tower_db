@@ -4,35 +4,56 @@ defmodule TowerDB.CircuitBreakerTest do
   alias TowerDB.CircuitBreaker
   alias TowerDB.CircuitBreaker.Storage
 
+  @processes [CircuitBreaker, Storage]
+
   setup do
-    # Configure short timeouts for faster tests
-    Application.put_env(:tower_db, :circuit_breaker,
-      failure_threshold: 3,
-      recovery_timeout: 50,
-      queue_retry_interval: 10,
-      max_queue_size: 10
-    )
+    stop_supervisor()
+    stop_processes(@processes)
 
-    # Stop the application supervisor to prevent it from restarting processes
-    case Process.whereis(TowerDB.Supervisor) do
-      nil -> :ok
-      pid -> Supervisor.stop(pid)
-    end
-
-    # Start fresh
     {:ok, _} = Storage.start_link()
     {:ok, _} = CircuitBreaker.start_link()
 
     on_exit(fn ->
-      Application.delete_env(:tower_db, :circuit_breaker)
-
-      case Process.whereis(CircuitBreaker) do
-        nil -> :ok
-        pid -> GenServer.stop(pid)
-      end
+      safe_call(CircuitBreaker, :reset)
+      stop_processes(@processes)
     end)
 
     :ok
+  end
+
+  defp stop_supervisor do
+    case Process.whereis(TowerDB.Supervisor) do
+      nil -> :ok
+      pid -> Supervisor.stop(pid)
+    end
+  end
+
+  defp stop_processes(names) do
+    for name <- names do
+      case Process.whereis(name) do
+        nil -> :ok
+        pid ->
+          try do
+            GenServer.stop(pid, :normal, 100)
+          catch
+            :exit, _ -> :ok
+          end
+      end
+    end
+
+    Process.sleep(10)
+  end
+
+  defp safe_call(name, fun) do
+    case Process.whereis(name) do
+      nil -> :ok
+      _pid ->
+        try do
+          apply(name, fun, [])
+        catch
+          :exit, _ -> :ok
+        end
+    end
   end
 
   describe "call/2 in closed state" do
@@ -78,7 +99,6 @@ defmodule TowerDB.CircuitBreakerTest do
     end
 
     test "returns dropped when queue is full" do
-      # Fill the queue (max is 10, we have 3 from setup)
       for _ <- 1..7 do
         CircuitBreaker.call(%{}, fn -> {:ok, :noop} end)
       end
