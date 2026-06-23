@@ -103,17 +103,19 @@ defmodule TowerDB.CircuitBreaker.Storage do
 
   @impl true
   def handle_call({:requeue, attrs_list}, _from, state) do
+    event_count = length(attrs_list)
+
     case :ets.first(state.table) do
       :"$end_of_table" ->
         # Queue is empty, just insert with current counter
         counter = state.counter + 1
         :ets.insert(state.table, {counter, attrs_list})
-        {:reply, :ok, %{state | counter: counter}}
+        {:reply, :ok, %{state | counter: counter, enqueued: state.enqueued + event_count}}
 
       min_key ->
         # Insert before the minimum key to preserve order
         :ets.insert(state.table, {min_key - 1, attrs_list})
-        {:reply, :ok, state}
+        {:reply, :ok, %{state | enqueued: state.enqueued + event_count}}
     end
   end
 
