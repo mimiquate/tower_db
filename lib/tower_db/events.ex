@@ -61,6 +61,8 @@ defmodule TowerDB.Events do
 
     case repo.transaction(multi) do
       {:ok, results} ->
+        events = Map.values(results)
+        add_events_to_cache(events)
         {:ok, map_size(results)}
 
       {:error, _failed_op, changeset, _changes} ->
@@ -78,6 +80,13 @@ defmodule TowerDB.Events do
     cached = get_cached_events()
     # Prepend new event (list is ordered by datetime desc)
     :ets.insert(@cache_table, {:events, [event | cached]})
+  end
+
+  defp add_events_to_cache(events) when is_list(events) do
+    cached = get_cached_events()
+    # Prepend new events (sorted by datetime desc)
+    sorted = Enum.sort_by(events, & &1.datetime, {:desc, DateTime})
+    :ets.insert(@cache_table, {:events, sorted ++ cached})
   end
 
   defp get_cached_events do
