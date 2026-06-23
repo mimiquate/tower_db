@@ -124,20 +124,54 @@ defmodule TowerDB.Buffer do
   end
 
   defp flush_to_circuit_breaker(state) do
-    events = Enum.reverse(state.buffer)
-    event_count = length(events)
+    events =
+      state.buffer
+      |> Enum.reverse()
+      |> Enum.reject(&skip_event?/1)
 
-    Logger.info("[Buffer] Flushing batch (#{event_count} events)")
+    if Enum.empty?(events) do
+      %{state | buffer: [], flush_timer_ref: nil}
+    else
+      event_count = length(events)
+      Logger.info("[Buffer] Flushing batch (#{event_count} events)")
 
-    CircuitBreaker.call_batch(events, fn ->
-      TowerDB.Events.create_events_batch(events)
-    end)
+      CircuitBreaker.call_batch(events, fn ->
+        TowerDB.Events.create_events_batch(events)
+      end)
 
-    %{state |
-      buffer: [],
-      flush_timer_ref: nil,
-      total_flushed: state.total_flushed + event_count
-    }
+      %{state |
+        buffer: [],
+        flush_timer_ref: nil,
+        total_flushed: state.total_flushed + event_count
+      }
+    end
+  end
+
+  # Filter DB-related errors that shouldn't be stored
+  defp skip_event?(%{reason: %Tower.ReportEventError{}}), do: true
+  defp skip_event?(%{reason: %DBConnection.ConnectionError{}}), do: true
+  defp skip_event?(%{reason: %Postgrex.Error{}}), do: true
+  defp skip_event?(%{reason: reason}) when reason != nil do
+    reason
+    |> inspect()
+    |> String.downcase()
+    |> db_error_string?()
+  end
+  defp skip_event?(_), do: false
+
+  defp db_error_string?(reason_str) do
+    db_patterns = [
+      "dbconnection",
+      "postgrex",
+      "econnrefused",
+      "connection_refused",
+      "ecto.adapters",
+      "tcp connect",
+      "connection not available",
+      "dropped from queue"
+    ]
+
+    Enum.any?(db_patterns, &String.contains?(reason_str, &1))
   end
 
   defp schedule_retry(state) do

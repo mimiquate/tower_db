@@ -240,29 +240,11 @@ defmodule TowerDB.CircuitBreaker do
   defp cancel_timer(nil), do: :ok
   defp cancel_timer(ref), do: Process.cancel_timer(ref)
 
+  # Events are already filtered in Buffer before reaching here
   defp queue_batch(attrs_list) do
-    filtered = Enum.reject(attrs_list, &skip_event?/1)
-
-    if Enum.empty?(filtered) do
-      Logger.debug("[CircuitBreaker] All events filtered - not queuing batch")
-      :ok
-    else
-      Logger.info("[CircuitBreaker] Batch enqueue (#{length(filtered)} events)")
-      Storage.enqueue(filtered)
-    end
+    Logger.info("[CircuitBreaker] Batch enqueue (#{length(attrs_list)} events)")
+    Storage.enqueue(attrs_list)
   end
-
-  # Filter Tower reporter errors (prevents infinite loop when reporter fails)
-  defp skip_event?(%{reason: %Tower.ReportEventError{}}), do: true
-  # Filter DB-related errors (not useful to store when DB recovers)
-  defp skip_event?(%{reason: reason}) do
-    reason_str = reason |> inspect() |> String.downcase()
-
-    Enum.any?(~w(dbconnection postgrex econnrefused ecto.adapters.sql), fn pattern ->
-      String.contains?(reason_str, pattern)
-    end)
-  end
-  defp skip_event?(_), do: false
 
   defp schedule_queue_processing do
     interval = config(:queue_retry_interval, @default_queue_retry_interval)

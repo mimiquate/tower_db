@@ -127,25 +127,6 @@ defmodule TowerDB.CircuitBreakerTest do
     end
   end
 
-  describe "event filtering" do
-    test "filters Tower.ReportEventError and DB connection errors from batch" do
-      errors = [
-        %Tower.ReportEventError{reporter: TowerDB.Reporter},
-        %DBConnection.ConnectionError{message: "connection refused"},
-        %Postgrex.Error{postgres: %{code: :connection_failure}},
-        %RuntimeError{message: "app error"}
-      ]
-
-      batch = Enum.map(errors, fn error -> %{reason: error} end)
-      CircuitBreaker.call_batch(batch, fn -> {:error, :fail} end)
-
-      assert CircuitBreaker.state().queue_size == 1
-
-      {:ok, [queued_event]} = Storage.dequeue()
-      assert %RuntimeError{} = queued_event.reason
-    end
-  end
-
   describe "state/0" do
     test "returns current state info with queue size" do
       CircuitBreaker.call_batch([%{reason: "test1"}], fn -> {:error, :fail} end)

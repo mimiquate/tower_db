@@ -168,5 +168,19 @@ defmodule TowerDB.BufferTest do
       assert state.total_flushed == 5
       assert state.buffer_size == 0
     end
+
+    test "filters DB-related errors and doesn't add them to buffer" do
+      Buffer.add(%{reason: %Tower.ReportEventError{reporter: TowerDB.Reporter}})
+      Buffer.add(%{reason: %DBConnection.ConnectionError{message: "connection refused"}})
+      Buffer.add(%{reason: %Postgrex.Error{postgres: %{code: :connection_failure}}})
+      Buffer.add(%{reason: %RuntimeError{message: "app error"}})
+
+      Process.sleep(10)
+
+      state = Buffer.state()
+
+      assert state.total_received == 1
+      assert state.buffer_size == 1
+    end
   end
 end
