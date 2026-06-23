@@ -2,6 +2,60 @@ defmodule TowerDB.ReporterTest do
   use TowerDB.DataCase, async: false
 
   alias TowerDB.Reporter
+  alias TowerDB.CircuitBreaker
+  alias TowerDB.CircuitBreaker.Storage
+
+  @processes [CircuitBreaker, Storage]
+
+  setup do
+    stop_supervisor()
+    stop_processes(@processes)
+
+    {:ok, _} = Storage.start_link()
+    {:ok, _} = CircuitBreaker.start_link()
+
+    on_exit(fn ->
+      safe_call(CircuitBreaker, :reset)
+      stop_processes(@processes)
+    end)
+
+    :ok
+  end
+
+  defp stop_supervisor do
+    case Process.whereis(TowerDB.Supervisor) do
+      nil -> :ok
+      pid -> Supervisor.stop(pid)
+    end
+  end
+
+  defp stop_processes(names) do
+    for name <- names do
+      case Process.whereis(name) do
+        nil -> :ok
+        pid ->
+          try do
+            GenServer.stop(pid, :normal, 100)
+          catch
+            :exit, _ -> :ok
+          end
+      end
+    end
+
+    Process.sleep(10)
+  end
+
+  defp safe_call(name, fun) do
+    case Process.whereis(name) do
+      nil -> :ok
+      _pid ->
+        try do
+          apply(name, fun, [])
+        catch
+          :exit, _ -> :ok
+        end
+    end
+  end
 
   describe "report_event/1" do
     test "reports error level events" do

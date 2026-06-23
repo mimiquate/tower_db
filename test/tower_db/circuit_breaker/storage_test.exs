@@ -4,22 +4,37 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
   alias TowerDB.CircuitBreaker.Storage
 
   setup do
-    # Stop the application supervisor to prevent it from restarting Storage
-    case Process.whereis(TowerDB.Supervisor) do
-      nil -> :ok
-      pid -> Supervisor.stop(pid)
-    end
+    stop_supervisor()
+    stop_process(Storage)
 
     {:ok, _pid} = Storage.start_link()
 
     on_exit(fn ->
-      case Process.whereis(Storage) do
-        nil -> :ok
-        pid -> GenServer.stop(pid)
-      end
+      stop_process(Storage)
     end)
 
     :ok
+  end
+
+  defp stop_supervisor do
+    case Process.whereis(TowerDB.Supervisor) do
+      nil -> :ok
+      pid -> Supervisor.stop(pid)
+    end
+  end
+
+  defp stop_process(name) do
+    case Process.whereis(name) do
+      nil -> :ok
+      pid ->
+        try do
+          GenServer.stop(pid, :normal, 100)
+        catch
+          :exit, _ -> :ok
+        end
+    end
+
+    Process.sleep(10)
   end
 
   describe "enqueue/1" do
