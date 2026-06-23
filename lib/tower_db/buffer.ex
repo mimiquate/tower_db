@@ -66,15 +66,19 @@ defmodule TowerDB.Buffer do
 
   @impl true
   def handle_cast({:add, attrs}, state) do
-    new_buffer = [attrs | state.buffer]
-    new_state = %{state | buffer: new_buffer, total_received: state.total_received + 1}
-
-    batch_size = config(:batch_size, @default_batch_size)
-
-    if length(new_buffer) >= batch_size do
-      {:noreply, do_flush(new_state)}
+    if skip_event?(attrs) do
+      {:noreply, state}
     else
-      {:noreply, ensure_timer(new_state)}
+      new_buffer = [attrs | state.buffer]
+      new_state = %{state | buffer: new_buffer, total_received: state.total_received + 1}
+
+      batch_size = config(:batch_size, @default_batch_size)
+
+      if length(new_buffer) >= batch_size do
+        {:noreply, do_flush(new_state)}
+      else
+        {:noreply, ensure_timer(new_state)}
+      end
     end
   end
 
