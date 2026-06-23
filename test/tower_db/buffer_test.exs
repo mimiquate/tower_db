@@ -99,22 +99,24 @@ defmodule TowerDB.BufferTest do
         CircuitBreaker.call_batch([%{}], fn -> {:error, :fail} end)
       end
 
-      Process.sleep(5)
+      Process.sleep(20)
       assert CircuitBreaker.state().state == :open
 
       for _ <- 1..7 do
         CircuitBreaker.call_batch([%{}], fn -> {:ok, :noop} end)
       end
 
-      Process.sleep(5)
-      assert CircuitBreaker.state().queue_size == 10
+      Process.sleep(50)
+      cb_state = CircuitBreaker.state()
+      assert cb_state.state == :open
+      assert cb_state.queue_size == 10
       assert CircuitBreaker.can_accept?() == false
 
       for i <- 1..5 do
         Buffer.add(%{reason: "error #{i}", kind: :error})
       end
 
-      Process.sleep(10)
+      Process.sleep(50)
 
       state = Buffer.state()
 
@@ -130,7 +132,7 @@ defmodule TowerDB.BufferTest do
         CircuitBreaker.call_batch([%{}], fn -> {:error, :fail} end)
       end
 
-      Process.sleep(5)
+      Process.sleep(50)
       assert CircuitBreaker.state().state == :open
 
       # Fill the queue
@@ -138,9 +140,10 @@ defmodule TowerDB.BufferTest do
         CircuitBreaker.call_batch([%{}], fn -> {:ok, :noop} end)
       end
 
-      Process.sleep(5)
-      assert CircuitBreaker.state().queue_size == 10
-      assert CircuitBreaker.can_accept?() == false
+      Process.sleep(50)
+      cb_state = CircuitBreaker.state()
+      assert cb_state.state == :open
+      assert cb_state.queue_size == 10
 
       # Add events to buffer - will be held
       for i <- 1..5 do

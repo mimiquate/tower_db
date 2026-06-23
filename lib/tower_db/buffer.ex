@@ -9,8 +9,10 @@ defmodule TowerDB.Buffer do
   ## Configuration
 
       config :tower_db, :buffer,
-        batch_size: 50,        # max events per batch
-        flush_interval: 500    # ms before forced flush
+        batch_size: 50,           # max events per batch
+        flush_interval: 500,      # ms before forced flush
+        max_buffer_size: 1000,    # max events in buffer (drops if exceeded)
+        backpressure_retry: 1000  # ms before retry when circuit breaker not ready
   """
 
   use GenServer
@@ -22,6 +24,7 @@ defmodule TowerDB.Buffer do
   @default_batch_size 50
   @default_flush_interval 500
   @default_backpressure_retry 1000
+  @default_max_buffer_size 1000
 
   # Client API
 
@@ -60,25 +63,33 @@ defmodule TowerDB.Buffer do
       buffer: [],
       flush_timer_ref: nil,
       total_received: 0,
-      total_flushed: 0
+      total_flushed: 0,
+      total_dropped: 0
     }}
   end
 
   @impl true
   def handle_cast({:add, attrs}, state) do
-    if skip_event?(attrs) do
-      {:noreply, state}
-    else
-      new_buffer = [attrs | state.buffer]
-      new_state = %{state | buffer: new_buffer, total_received: state.total_received + 1}
+    cond do
+      skip_event?(attrs) ->
+        {:noreply, state}
 
-      batch_size = config(:batch_size, @default_batch_size)
+      length(state.buffer) >= config(:max_buffer_size, @default_max_buffer_size) ->
+        # Buffer full, drop event
+        Logger.warning("[Buffer] Buffer full, dropping event")
+        {:noreply, %{state | total_dropped: state.total_dropped + 1}}
 
-      if length(new_buffer) >= batch_size do
-        {:noreply, do_flush(new_state)}
-      else
-        {:noreply, ensure_timer(new_state)}
-      end
+      true ->
+        new_buffer = [attrs | state.buffer]
+        new_state = %{state | buffer: new_buffer, total_received: state.total_received + 1}
+
+        batch_size = config(:batch_size, @default_batch_size)
+
+        if length(new_buffer) >= batch_size do
+          {:noreply, do_flush(new_state)}
+        else
+          {:noreply, ensure_timer(new_state)}
+        end
     end
   end
 
@@ -93,7 +104,8 @@ defmodule TowerDB.Buffer do
     stats = %{
       buffer_size: length(state.buffer),
       total_received: state.total_received,
-      total_flushed: state.total_flushed
+      total_flushed: state.total_flushed,
+      total_dropped: state.total_dropped
     }
 
     {:reply, stats, state}
@@ -128,27 +140,41 @@ defmodule TowerDB.Buffer do
   end
 
   defp flush_to_circuit_breaker(state) do
-    events =
-      state.buffer
-      |> Enum.reverse()
-      |> Enum.reject(&skip_event?/1)
+    batch_size = config(:batch_size, @default_batch_size)
+    all_events = Enum.reverse(state.buffer)
 
-    if Enum.empty?(events) do
-      %{state | buffer: [], flush_timer_ref: nil}
+    {to_flush, remaining} = Enum.split(all_events, batch_size)
+    event_count = length(to_flush)
+
+    Logger.info("[Buffer] Flushing batch (#{event_count} events)")
+
+    CircuitBreaker.call_batch(to_flush, fn ->
+      TowerDB.Events.create_events_batch(to_flush)
+    end)
+
+    new_state = %{state |
+      buffer: Enum.reverse(remaining),
+      flush_timer_ref: nil,
+      total_flushed: state.total_flushed + event_count
+    }
+
+    # If more events remain, continue flushing
+    if remaining != [] do
+      do_flush(new_state)
     else
-      event_count = length(events)
-      Logger.info("[Buffer] Flushing batch (#{event_count} events)")
-
-      CircuitBreaker.call_batch(events, fn ->
-        TowerDB.Events.create_events_batch(events)
-      end)
-
-      %{state |
-        buffer: [],
-        flush_timer_ref: nil,
-        total_flushed: state.total_flushed + event_count
-      }
+      log_buffer_summary(new_state)
+      new_state
     end
+  end
+
+  defp log_buffer_summary(%{total_dropped: 0}), do: :ok
+
+  defp log_buffer_summary(state) do
+    Logger.info(
+      "[Buffer] Processing complete: " <>
+      "#{state.total_flushed} flushed, " <>
+      "#{state.total_dropped} dropped"
+    )
   end
 
   # Filter DB-related errors that shouldn't be stored
