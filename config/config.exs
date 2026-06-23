@@ -11,3 +11,5 @@ config :tower_db,
   ecto_repos: [TowerDB.TestRepo]
 
 config :logger, level: :warning
+
+import_config "#{config_env()}.exs"
