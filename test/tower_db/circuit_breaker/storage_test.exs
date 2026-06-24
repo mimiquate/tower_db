@@ -47,21 +47,14 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
     end
 
     test "returns :dropped when queue is full" do
-      # Set a small max size for testing
-      Application.put_env(:tower_db, :circuit_breaker, max_queue_size: 3)
-
-      on_exit(fn ->
-        Application.delete_env(:tower_db, :circuit_breaker)
-      end)
-
-      # Fill the queue
-      assert :ok = Storage.enqueue([%{id: 1}])
-      assert :ok = Storage.enqueue([%{id: 2}])
-      assert :ok = Storage.enqueue([%{id: 3}])
+      # Fill the queue (max_queue_size is 10 in test config)
+      for i <- 1..10 do
+        assert :ok = Storage.enqueue([%{id: i}])
+      end
 
       # This should be dropped
-      assert :dropped = Storage.enqueue([%{id: 4}])
-      assert Storage.queue_size() == 3
+      assert :dropped = Storage.enqueue([%{id: 11}])
+      assert Storage.queue_size() == 10
     end
   end
 
@@ -103,19 +96,14 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
     end
 
     test "does not check max_size" do
-      Application.put_env(:tower_db, :circuit_breaker, max_queue_size: 2)
-
-      on_exit(fn ->
-        Application.delete_env(:tower_db, :circuit_breaker)
-      end)
-
-      # Fill the queue
-      Storage.enqueue([%{id: 1}])
-      Storage.enqueue([%{id: 2}])
+      # Fill the queue (max_queue_size is 10 in test config)
+      for i <- 1..10 do
+        Storage.enqueue([%{id: i}])
+      end
 
       # Requeue should work even though queue is full
       assert :ok = Storage.requeue([%{id: 0}])
-      assert Storage.queue_size() == 3
+      assert Storage.queue_size() == 11
     end
   end
 
@@ -150,18 +138,14 @@ defmodule TowerDB.CircuitBreaker.StorageTest do
     end
 
     test "tracks dropped event count" do
-      Application.put_env(:tower_db, :circuit_breaker, max_queue_size: 1)
+      # Fill the queue (max_queue_size is 10 in test config)
+      for i <- 1..10 do
+        Storage.enqueue([%{id: i}])
+      end
 
-      on_exit(fn ->
-        Application.delete_env(:tower_db, :circuit_breaker)
-      end)
-
-      # First batch (1 event) - enqueued
-      Storage.enqueue([%{id: 1}])
-      # Second batch (1 event) - dropped
-      Storage.enqueue([%{id: 2}])
-      # Third batch (2 events) - dropped
-      Storage.enqueue([%{id: 3}, %{id: 4}])
+      # These batches should be dropped
+      Storage.enqueue([%{id: 11}])
+      Storage.enqueue([%{id: 12}, %{id: 13}])
 
       stats = Storage.state()
       assert stats.events_dropped == 3
