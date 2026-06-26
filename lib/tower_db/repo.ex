@@ -8,4 +8,8 @@ defmodule TowerDB.Repo do
   def max_events do
     Application.get_env(:tower_db, :max_events)
   end
+
+  def cleanup_strategy do
+    Application.get_env(:tower_db, :cleanup_strategy)
+  end
 end
