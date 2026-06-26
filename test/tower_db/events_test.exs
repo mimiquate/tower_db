@@ -121,4 +121,80 @@ defmodule TowerDB.EventsTest do
       assert length(events) == 10
     end
   end
+
+  describe "prune_old/1" do
+    test "deletes events older than specified days" do
+      now = DateTime.utc_now()
+
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: DateTime.add(now, -100, :day),
+          level: :error,
+          reason: "old_event"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: DateTime.add(now, -10, :day),
+          level: :error,
+          reason: "recent_event"
+        })
+
+      assert length(Events.list_events()) == 2
+
+      {deleted_count, nil} = Events.prune_old(days: 30)
+
+      assert deleted_count == 1
+
+      events = Events.list_events()
+      assert length(events) == 1
+      assert hd(events).reason == "recent_event"
+    end
+
+    test "does not delete events newer than specified days" do
+      now = DateTime.utc_now()
+
+      for i <- 1..3 do
+        {:ok, _} =
+          Events.create_event(%{
+            datetime: DateTime.add(now, -i, :day),
+            level: :error,
+            reason: "event_#{i}"
+          })
+      end
+
+      assert length(Events.list_events()) == 3
+
+      {deleted_count, nil} = Events.prune_old(days: 30)
+
+      assert deleted_count == 0
+      assert length(Events.list_events()) == 3
+    end
+
+    test "deletes only events older than threshold, keeps recent ones" do
+      now = DateTime.utc_now()
+
+      {:ok, _} = Events.create_event(%{datetime: DateTime.add(now, -60, :day), level: :error, reason: "old_1"})
+      {:ok, _} = Events.create_event(%{datetime: DateTime.add(now, -45, :day), level: :error, reason: "old_2"})
+      {:ok, _} = Events.create_event(%{datetime: DateTime.add(now, -35, :day), level: :error, reason: "old_3"})
+      {:ok, _} = Events.create_event(%{datetime: DateTime.add(now, -20, :day), level: :error, reason: "recent_1"})
+      {:ok, _} = Events.create_event(%{datetime: DateTime.add(now, -5, :day), level: :error, reason: "recent_2"})
+
+      assert length(Events.list_events()) == 5
+
+      {deleted_count, nil} = Events.prune_old(days: 30)
+
+      assert deleted_count == 3
+
+      events = Events.list_events()
+      assert length(events) == 2
+
+      reasons = Enum.map(events, & &1.reason)
+      assert "recent_1" in reasons
+      assert "recent_2" in reasons
+      refute "old_1" in reasons
+      refute "old_2" in reasons
+      refute "old_3" in reasons
+    end
+  end
 end
