@@ -1,6 +1,8 @@
 defmodule TowerDB.Events do
   import Ecto.Query
 
+  require Logger
+
   alias TowerDB.Event
   alias TowerDB.Repo
 
@@ -45,6 +47,24 @@ defmodule TowerDB.Events do
     repo = Keyword.get(opts, :repo) || Repo.repo()
 
     repo.delete(event)
+  end
+
+  def prune_old(opts \\ []) do
+    repo = Keyword.get(opts, :repo) || Repo.repo()
+    days = Keyword.fetch!(opts, :days)
+
+    seconds = trunc(days * 24 * 60 * 60)
+    cutoff = DateTime.utc_now() |> DateTime.add(-seconds, :second)
+
+    {deleted_count, _} =
+      from(e in Event, where: e.datetime < ^cutoff)
+      |> repo.delete_all()
+
+    if deleted_count > 0 do
+      Logger.info("[TowerDB] Pruned #{deleted_count} events older than #{days} days")
+    end
+
+    {deleted_count, nil}
   end
 
   defp delete_oldest_if_at_limit(repo, opts) do
