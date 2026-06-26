@@ -34,6 +34,8 @@ defmodule TowerDB.Events do
   def create_event(attrs, opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
 
+    delete_oldest_if_at_limit(repo, opts)
+
     %Event{}
     |> Event.changeset(attrs)
     |> repo.insert()
@@ -43,5 +45,25 @@ defmodule TowerDB.Events do
     repo = Keyword.get(opts, :repo) || Repo.repo()
 
     repo.delete(event)
+  end
+
+  defp delete_oldest_if_at_limit(repo, opts) do
+    max_events = Keyword.get(opts, :max_events) || Repo.max_events()
+
+    if max_events do
+      current_count = repo.aggregate(Event, :count)
+
+      if current_count >= max_events do
+        delete_oldest_event(repo)
+      end
+    end
+  end
+
+  defp delete_oldest_event(repo) do
+    Event
+    |> order_by(asc: :datetime)
+    |> limit(1)
+    |> repo.one!()
+    |> repo.delete()
   end
 end
