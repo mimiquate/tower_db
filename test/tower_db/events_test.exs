@@ -68,4 +68,57 @@ defmodule TowerDB.EventsTest do
       assert Events.list_events() == []
     end
   end
+
+  describe "max_events enforcement" do
+    test "deletes oldest events when exceeding max_events limit" do
+      # Create 5 events with max_events: 5, all should be kept
+      for i <- 1..5 do
+        {:ok, _} =
+          Events.create_event(
+            %{
+              datetime: DateTime.add(~U[2026-05-08 10:00:00.000000Z], i, :hour),
+              level: :error,
+              reason: "event_#{i}"
+            },
+            max_events: 5
+          )
+      end
+
+      assert length(Events.list_events()) == 5
+
+      # Create 6th event with max_events: 5, should delete the oldest
+      {:ok, _} =
+        Events.create_event(
+          %{
+            datetime: ~U[2026-05-08 16:00:00.000000Z],
+            level: :error,
+            reason: "event_6"
+          },
+          max_events: 5
+        )
+
+      events = Events.list_events()
+      assert length(events) == 5
+
+      reasons = Enum.map(events, & &1.reason)
+      refute "event_1" in reasons
+      assert "event_6" in reasons
+    end
+
+    test "keeps all events when max_events is not configured" do
+      # Create 10 events without max_events config
+      for i <- 1..10 do
+        {:ok, _} =
+          Events.create_event(%{
+            datetime: DateTime.add(~U[2026-05-08 10:00:00.000000Z], i, :hour),
+            level: :error,
+            reason: "event_#{i}"
+          })
+      end
+
+      # All 10 events should be kept since no limit is configured
+      events = Events.list_events()
+      assert length(events) == 10
+    end
+  end
 end
