@@ -120,6 +120,82 @@ defmodule TowerDB.EventsTest do
 
       assert length(events) == 2
     end
+
+    test "filters events by level" do
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          reason: "Error event"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          reason: "Warning event"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :info,
+          reason: "Info event"
+        })
+
+      events = Events.list_events(filters: [level: :error])
+
+      assert length(events) == 1
+      assert hd(events).level == :error
+    end
+
+    test "returns all events when level is nil" do
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          reason: "Error event"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          reason: "Warning event"
+        })
+
+      events = Events.list_events(filters: [level: nil])
+
+      assert length(events) == 2
+    end
+
+    test "combines search and level filters" do
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          reason: "Database error"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :error,
+          reason: "Network error"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :warning,
+          reason: "Database warning"
+        })
+
+      events = Events.list_events(filters: [search: "database", level: :error])
+
+      assert length(events) == 1
+      assert hd(events).reason == "Database error"
+    end
   end
 
   describe "delete_event/2" do
