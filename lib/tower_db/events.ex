@@ -18,16 +18,21 @@ defmodule TowerDB.Events do
       |> order_by(desc: :datetime)
       |> limit(^limit)
       |> offset(^offset)
+      |> maybe_filter_by_level(Keyword.get(filters, :level))
       |> repo.all()
     else
       Event
       |> order_by(desc: :datetime)
+      |> maybe_filter_by_level(Keyword.get(filters, :level))
       |> repo.all()
       |> maybe_filter_by_search(search)
       |> Enum.drop(offset)
       |> Enum.take(limit)
     end
   end
+
+  defp maybe_filter_by_level(query, nil), do: query
+  defp maybe_filter_by_level(query, level), do: where(query, [e], e.level == ^level)
 
   defp maybe_filter_by_search(events, ""), do: events
 
