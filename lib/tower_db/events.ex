@@ -71,6 +71,9 @@ defmodule TowerDB.Events do
       {:level, value}, dynamic when not is_nil(value) ->
         dynamic([e], ^dynamic and e.level == ^value)
 
+      {:ids, values}, dynamic when is_list(values) and values != [] ->
+        dynamic([e], ^dynamic and e.id in ^values)
+
       {_, _}, dynamic ->
         dynamic
     end)
