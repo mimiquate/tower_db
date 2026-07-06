@@ -196,6 +196,75 @@ defmodule TowerDB.EventsTest do
       assert length(events) == 1
       assert hd(events).reason == "Database error"
     end
+
+    test "filters events by id" do
+      {:ok, event1} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          reason: "First event"
+        })
+
+      {:ok, _event2} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          reason: "Second event"
+        })
+
+      events = Events.list_events(filters: [ids: ["#{event1.id}"]])
+
+      assert length(events) == 1
+      assert hd(events).id == event1.id
+    end
+
+    test "returns all events when id filter is not specified" do
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          reason: "First event"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          reason: "Second event"
+        })
+
+      events = Events.list_events(filters: [])
+
+      assert length(events) == 2
+    end
+
+    test "combines all filters" do
+      {:ok, event1} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          reason: "Database error"
+        })
+
+      {:ok, _event2} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :error,
+          reason: "Network error"
+        })
+
+      {:ok, _event3} =
+        Events.create_event(%{
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :warning,
+          reason: "Database warning"
+        })
+
+      events = Events.list_events(filters: [search: "database", level: :error, ids: ["#{event1.id}"]])
+
+      assert length(events) == 1
+      assert hd(events).id == event1.id
+    end
   end
 
   describe "delete_event/2" do
