@@ -24,13 +24,13 @@ defmodule TowerDB.ReporterTest do
       assert match?(%RuntimeError{message: "Critical event"}, hd(events).reason)
     end
 
-    test "ignores warning level events" do
+    test "report warning level events" do
       event = build_tower_event(:warning, "Warning event")
 
       assert :ok = Reporter.report_event(event)
 
       events = TowerDB.Events.list_events()
-      assert length(events) == 0
+      assert length(events) == 1
     end
 
     test "extracts all event attributes correctly" do
