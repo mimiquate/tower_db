@@ -53,4 +53,19 @@ defmodule TowerDB.EventsTest do
       assert Enum.map(events, & &1.reason) == ["third", "second", "first"]
     end
   end
+
+  describe "delete_event/2" do
+    test "deletes an existing event" do
+      {:ok, event} =
+        Events.create_event(%{
+          datetime: ~U[2026-04-16 12:00:00.000000Z],
+          level: :error,
+          reason: "to be deleted"
+        })
+
+      assert {:ok, deleted_event} = Events.delete_event(event)
+      assert deleted_event.id == event.id
+      assert Events.list_events() == []
+    end
+  end
 end
