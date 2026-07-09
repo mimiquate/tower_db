@@ -38,4 +38,10 @@ defmodule TowerDB.Events do
     |> Event.changeset(attrs)
     |> repo.insert()
   end
+
+  def delete_event(%Event{} = event, opts \\ []) do
+    repo = Keyword.get(opts, :repo) || Repo.repo()
+
+    repo.delete(event)
+  end
 end
