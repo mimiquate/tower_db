@@ -9,7 +9,7 @@ Add `tower_db` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tower_db, "~> 0.1.0"},
+    {:tower_db, "~> 0.2.0"},
     {:postgrex, ">= 0.0.0"}
   ]
 end
