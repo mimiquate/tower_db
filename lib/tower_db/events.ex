@@ -55,14 +55,17 @@ defmodule TowerDB.Events do
     repo = Keyword.get(opts, :repo) || Repo.repo()
     filters = Keyword.get(opts, :filters, [])
     search = Keyword.get(filters, :search, "")
+    level = Keyword.get(filters, :level)
 
     if search == "" do
       Event
+      |> maybe_filter_by_level(level)
       |> repo.aggregate(:count)
     else
       # When filtering by search, we need to count in-memory
       # since the reason field is serialized
       Event
+      |> maybe_filter_by_level(level)
       |> repo.all()
       |> maybe_filter_by_search(search)
       |> length()
