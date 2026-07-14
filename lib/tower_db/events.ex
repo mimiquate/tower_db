@@ -11,13 +11,22 @@ defmodule TowerDB.Events do
     filters = Keyword.get(opts, :filters, [])
     limit = Keyword.get(opts, :limit, @default_limit)
     offset = Keyword.get(opts, :offset, 0)
+    search = Keyword.get(filters, :search, "")
 
-    Event
-    |> order_by(desc: :datetime)
-    |> limit(^limit)
-    |> offset(^offset)
-    |> repo.all()
-    |> maybe_filter_by_search(Keyword.get(filters, :search, ""))
+    if search == "" do
+      Event
+      |> order_by(desc: :datetime)
+      |> limit(^limit)
+      |> offset(^offset)
+      |> repo.all()
+    else
+      Event
+      |> order_by(desc: :datetime)
+      |> repo.all()
+      |> maybe_filter_by_search(search)
+      |> Enum.drop(offset)
+      |> Enum.take(limit)
+    end
   end
 
   defp maybe_filter_by_search(events, ""), do: events
@@ -39,9 +48,20 @@ defmodule TowerDB.Events do
 
   def count_events(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
+    filters = Keyword.get(opts, :filters, [])
+    search = Keyword.get(filters, :search, "")
 
-    Event
-    |> repo.aggregate(:count)
+    if search == "" do
+      Event
+      |> repo.aggregate(:count)
+    else
+      # When filtering by search, we need to count in-memory
+      # since the reason field is serialized
+      Event
+      |> repo.all()
+      |> maybe_filter_by_search(search)
+      |> length()
+    end
   end
 
   def get_event(id, opts \\ []) do
