@@ -11,24 +11,30 @@ defmodule TowerDB.Events do
     limit = Keyword.get(opts, :limit, @default_limit)
     offset = Keyword.get(opts, :offset, 0)
 
-    Event
-    |> order_by(desc: :datetime)
-    |> limit(^limit)
-    |> offset(^offset)
-    |> repo.all()
+    with_db_protection(fn ->
+      Event
+      |> order_by(desc: :datetime)
+      |> limit(^limit)
+      |> offset(^offset)
+      |> repo.all()
+    end)
   end
 
   def count_events(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
 
-    Event
-    |> repo.aggregate(:count)
+    with_db_protection(fn ->
+      Event
+      |> repo.aggregate(:count)
+    end)
   end
 
   def get_event(id, opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
 
-    repo.get(Event, id)
+    with_db_protection(fn ->
+      repo.get(Event, id)
+    end)
   end
 
   def create_event(attrs, opts \\ []) do
@@ -43,5 +49,25 @@ defmodule TowerDB.Events do
     repo = Keyword.get(opts, :repo) || Repo.repo()
 
     repo.delete(event)
+  end
+
+  defp with_db_protection(fun) do
+    if db_unavailable?() do
+      {:error, :database_unavailable}
+    else
+      try do
+        {:ok, fun.()}
+      rescue
+        _e -> {:error, :database_unavailable}
+      catch
+        :exit, _reason -> {:error, :database_unavailable}
+      end
+    end
+  end
+
+  defp db_unavailable? do
+    TowerDB.CircuitBreaker.state().state == :open
+  catch
+    :exit, _ -> true
   end
 end
