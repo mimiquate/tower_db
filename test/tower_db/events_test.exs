@@ -24,7 +24,7 @@ defmodule TowerDB.EventsTest do
 
   describe "list_events/1" do
     test "returns events ordered by datetime descending" do
-      assert Events.list_events() == []
+      assert {:ok, []} = Events.list_events()
 
       {:ok, _} =
         Events.create_event(%{
@@ -47,7 +47,7 @@ defmodule TowerDB.EventsTest do
           reason: "second"
         })
 
-      events = Events.list_events()
+      {:ok, events} = Events.list_events()
 
       assert length(events) == 3
       assert Enum.map(events, & &1.reason) == ["third", "second", "first"]
@@ -65,7 +65,7 @@ defmodule TowerDB.EventsTest do
 
       assert {:ok, deleted_event} = Events.delete_event(event)
       assert deleted_event.id == event.id
-      assert Events.list_events() == []
+      assert {:ok, []} = Events.list_events()
     end
   end
 end

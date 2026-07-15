@@ -63,7 +63,7 @@ defmodule TowerDB.ReporterTest do
 
       assert :ok = Reporter.report_event(event)
 
-      events = TowerDB.Events.list_events()
+      {:ok, events} = TowerDB.Events.list_events()
       assert length(events) == 1
       assert match?(%RuntimeError{message: "Error event"}, hd(events).reason)
     end
@@ -73,7 +73,7 @@ defmodule TowerDB.ReporterTest do
 
       assert :ok = Reporter.report_event(event)
 
-      events = TowerDB.Events.list_events()
+      {:ok, events} = TowerDB.Events.list_events()
       assert length(events) == 1
       assert match?(%RuntimeError{message: "Critical event"}, hd(events).reason)
     end
@@ -83,7 +83,7 @@ defmodule TowerDB.ReporterTest do
 
       assert :ok = Reporter.report_event(event)
 
-      events = TowerDB.Events.list_events()
+      {:ok, events} = TowerDB.Events.list_events()
       assert length(events) == 1
     end
 
@@ -100,7 +100,7 @@ defmodule TowerDB.ReporterTest do
 
       Reporter.report_event(event)
 
-      [db_event] = TowerDB.Events.list_events()
+      {:ok, [db_event]} = TowerDB.Events.list_events()
 
       assert db_event.datetime == ~U[2026-05-08 12:00:00.000000Z]
       assert db_event.level == :error
@@ -118,7 +118,7 @@ defmodule TowerDB.ReporterTest do
 
       Reporter.report_event(event)
 
-      [db_event] = TowerDB.Events.list_events()
+      {:ok, [db_event]} = TowerDB.Events.list_events()
 
       assert db_event.stacktrace == nil
       assert db_event.metadata == nil
