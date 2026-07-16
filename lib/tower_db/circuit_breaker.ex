@@ -74,15 +74,19 @@ defmodule TowerDB.CircuitBreaker do
 
   @impl true
   def handle_call({:call, attrs, fun}, _from, %{state: :closed} = state) do
-    case execute(fun) do
-      {:ok, result} ->
-        {:reply, {:ok, result}, reset_failures(state)}
+    if skip_event?(attrs) do
+      {:reply, {:skipped, :filtered_event}, state}
+    else
+      case execute(fun) do
+        {:ok, result} ->
+          {:reply, {:ok, result}, reset_failures(state)}
 
-      {:error, reason} = error ->
-        new_state = record_failure(state)
-        Logger.warning("[CircuitBreaker] Database operation failed: #{inspect(reason)}")
-        queue_event(attrs)
-        {:reply, error, new_state}
+        {:error, reason} = error ->
+          new_state = record_failure(state)
+          Logger.warning("[CircuitBreaker] Database operation failed: #{inspect(reason)}")
+          queue_event(attrs)
+          {:reply, error, new_state}
+      end
     end
   end
 

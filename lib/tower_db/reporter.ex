@@ -36,6 +36,9 @@ defmodule TowerDB.Reporter do
       {:dropped, :queue_full} ->
         Logger.error("[TowerDB] Event dropped - queue full")
 
+      {:skipped, :filtered_event} ->
+        Logger.debug("[TowerDB] Filtering event - not queuing")
+
       {:error, reason} ->
         Logger.error("[TowerDB] Insert failed: #{inspect(reason)}")
     end
