@@ -107,12 +107,12 @@ defmodule TowerDB.CircuitBreaker.Storage do
         # Queue is empty, just insert with current counter
         counter = state.counter + 1
         :ets.insert(state.table, {counter, attrs})
-        {:reply, :ok, %{state | counter: counter}}
+        {:reply, :ok, %{state | counter: counter, enqueued: state.enqueued + 1}}
 
       min_key ->
         # Insert before the minimum key to preserve order
         :ets.insert(state.table, {min_key - 1, attrs})
-        {:reply, :ok, state}
+        {:reply, :ok, %{state | enqueued: state.enqueued + 1}}
     end
   end
 
