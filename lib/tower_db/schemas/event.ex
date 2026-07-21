@@ -13,6 +13,7 @@ defmodule TowerDB.Event do
 
     field(:kind, Ecto.Enum, values: [:error, :exit, :throw, :message])
     field(:reason, TowerDB.Types.Term)
+    field(:normalized_reason, :string)
     field(:stacktrace, TowerDB.Types.Term)
     field(:log_event, TowerDB.Types.Term)
     field(:plug_conn, TowerDB.Types.Term)
@@ -37,5 +38,22 @@ defmodule TowerDB.Event do
       :by
     ])
     |> validate_required([:similarity_id, :datetime, :level, :kind, :reason])
+    |> put_normalized_reason()
   end
+
+  defp put_normalized_reason(changeset) do
+    case get_change(changeset, :reason) do
+      nil ->
+        changeset
+
+      reason ->
+        kind = get_field(changeset, :kind)
+        stacktrace = get_field(changeset, :stacktrace) || []
+        normalized_reason = format_reason(kind, reason, stacktrace)
+        put_change(changeset, :normalized_reason, normalized_reason)
+    end
+  end
+
+  defp format_reason(:message, reason, _stacktrace), do: inspect(reason)
+  defp format_reason(kind, reason, stacktrace), do: Exception.format(kind, reason, stacktrace)
 end
