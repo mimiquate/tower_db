@@ -13,11 +13,16 @@ defmodule TowerDB.Reporter do
 
   defp do_report_event(%Tower.Event{} = event) do
     attrs = %{
+      similarity_id: event.similarity_id,
       datetime: event.datetime,
       level: event.level,
+      kind: event.kind,
       reason: event.reason,
       stacktrace: event.stacktrace,
-      metadata: event.metadata
+      log_event: event.log_event,
+      plug_conn: event.plug_conn,
+      metadata: event.metadata,
+      by: if(event.by, do: inspect(event.by))
     }
 
     case TowerDB.Events.create_event(attrs) do
