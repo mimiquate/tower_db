@@ -15,24 +15,21 @@ defmodule TowerDB.Events do
 
     if search == "" do
       Event
+      |> where(^filter_where(filters))
       |> order_by(desc: :datetime)
       |> limit(^limit)
       |> offset(^offset)
-      |> maybe_filter_by_level(Keyword.get(filters, :level))
       |> repo.all()
     else
       Event
+      |> where(^filter_where(filters))
       |> order_by(desc: :datetime)
-      |> maybe_filter_by_level(Keyword.get(filters, :level))
       |> repo.all()
       |> maybe_filter_by_search(search)
       |> Enum.drop(offset)
       |> Enum.take(limit)
     end
   end
-
-  defp maybe_filter_by_level(query, nil), do: query
-  defp maybe_filter_by_level(query, level), do: where(query, [e], e.level == ^level)
 
   defp maybe_filter_by_search(events, ""), do: events
 
@@ -51,25 +48,32 @@ defmodule TowerDB.Events do
   defp format_reason(reason) when is_binary(reason), do: reason
   defp format_reason(reason), do: inspect(reason)
 
-  def count_events(opts \\ []) do
+    def count_events(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
     filters = Keyword.get(opts, :filters, [])
     search = Keyword.get(filters, :search, "")
-    level = Keyword.get(filters, :level)
 
     if search == "" do
       Event
-      |> maybe_filter_by_level(level)
+      |> where(^filter_where(filters))
       |> repo.aggregate(:count)
     else
-      # When filtering by search, we need to count in-memory
-      # since the reason field is serialized
       Event
-      |> maybe_filter_by_level(level)
+      |> where(^filter_where(filters))
       |> repo.all()
       |> maybe_filter_by_search(search)
       |> length()
     end
+  end
+
+  defp filter_where(filters) do
+    Enum.reduce(filters, dynamic(true), fn
+      {:level, value}, dynamic when not is_nil(value) ->
+        dynamic([e], ^dynamic and e.level == ^value)
+
+      {_, _}, dynamic ->
+        dynamic
+    end)
   end
 
   def get_event(id, opts \\ []) do
