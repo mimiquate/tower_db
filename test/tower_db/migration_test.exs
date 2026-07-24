@@ -17,11 +17,16 @@ defmodule TowerDB.MigrationTest do
 
       columns = get_columns("tower_db_events")
       assert "id" in columns
+      assert "similarity_id" in columns
       assert "datetime" in columns
       assert "level" in columns
+      assert "kind" in columns
       assert "reason" in columns
       assert "stacktrace" in columns
+      assert "log_event" in columns
+      assert "plug_conn" in columns
       assert "metadata" in columns
+      assert "by" in columns
       assert "inserted_at" in columns
       assert "updated_at" in columns
 
