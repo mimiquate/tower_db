@@ -147,6 +147,107 @@ defmodule TowerDB.EventsTest do
 
       assert length(events) == 2
     end
+
+    test "filters events by level" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %DBConnection.ConnectionError{message: "connection is not available"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "invalid argument"}
+        })
+
+      events = Events.list_events(filters: [level: :error])
+
+      assert length(events) == 1
+      assert hd(events).level == :error
+    end
+
+    test "returns all events when level filter is nil" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %DBConnection.ConnectionError{message: "connection is not available"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "invalid argument"}
+        })
+
+      events = Events.list_events(filters: [level: nil])
+
+      assert length(events) == 2
+    end
+
+    test "returns empty list when no events match level filter" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %DBConnection.ConnectionError{message: "connection is not available"}
+        })
+
+      events = Events.list_events(filters: [level: :warning])
+
+      assert events == []
+    end
+
+    test "filters events by level and search term" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %DBConnection.ConnectionError{message: "connection is not available"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %DBConnection.ConnectionError{message: "connection is not available"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 3,
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %ArgumentError{message: "invalid argument"}
+        })
+
+      events = Events.list_events(filters: [level: :error, search: "connection"])
+
+      assert length(events) == 1
+
+      assert hd(events).reason == %DBConnection.ConnectionError{
+               message: "connection is not available"
+             }
+    end
   end
 
   describe "delete_event/2" do
