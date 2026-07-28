@@ -54,6 +54,9 @@ defmodule TowerDB.Event do
     end
   end
 
-  defp format_reason(:message, reason, _stacktrace), do: inspect(reason)
+  # Exception.format/3 only handles :error, :exit, and :throw kinds.
+  # :message is a Tower-specific kind for manually reported messages,
+  # so we handle it separately.
+  defp format_reason(:message, reason, _stacktrace), do: reason
   defp format_reason(kind, reason, stacktrace), do: Exception.format(kind, reason, stacktrace)
 end
