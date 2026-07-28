@@ -26,10 +26,12 @@ defmodule TowerDB.Migration do
   def up do
     TowerDB.Migration.V01.up()
     TowerDB.Migration.V02.up()
+    TowerDB.Migration.V03.up()
   end
 
   @spec down() :: :ok
   def down do
+    TowerDB.Migration.V03.down()
     TowerDB.Migration.V02.down()
     TowerDB.Migration.V01.down()
   end
