@@ -12,8 +12,6 @@ defmodule TowerDB.Migration.V03 do
   end
 
   def down do
-    drop_if_exists index(:tower_db_events, [:normalized_reason])
-
     alter table(:tower_db_events) do
       remove(:normalized_reason)
     end
