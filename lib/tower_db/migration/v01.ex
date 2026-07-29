@@ -19,8 +19,6 @@ defmodule TowerDB.Migration.V01 do
   end
 
   def down do
-    drop_if_exists index(:tower_db_events, [:level])
-    drop_if_exists index(:tower_db_events, [:datetime])
     drop_if_exists table(:tower_db_events)
   end
 end
