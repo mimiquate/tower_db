@@ -6,15 +6,19 @@ defmodule TowerDB.EventsTest do
   describe "create_event/1" do
     test "creates an event with valid attrs" do
       attrs = %{
+        similarity_id: 12345,
         datetime: ~U[2026-04-16 12:00:00.000000Z],
         level: :error,
+        kind: :error,
         reason: %RuntimeError{message: "Something went wrong"}
       }
 
       assert {:ok, event} = Events.create_event(attrs)
       assert event.datetime == ~U[2026-04-16 12:00:00.000000Z]
       assert event.level == :error
+      assert event.kind == :error
       assert event.reason == %RuntimeError{message: "Something went wrong"}
+      assert event.similarity_id == 12345
     end
 
     test "returns error with invalid attrs" do
@@ -28,29 +32,40 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
-          reason: "first"
+          kind: :error,
+          reason: %ArgumentError{message: "first"}
         })
 
       {:ok, _} =
         Events.create_event(%{
+          similarity_id: 2,
           datetime: ~U[2026-05-08 12:00:00.000000Z],
           level: :error,
-          reason: "third"
+          kind: :error,
+          reason: %RuntimeError{message: "third"}
         })
 
       {:ok, _} =
         Events.create_event(%{
+          similarity_id: 3,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
-          level: :error,
+          level: :warning,
+          kind: :message,
           reason: "second"
         })
 
       events = Events.list_events()
 
       assert length(events) == 3
-      assert Enum.map(events, & &1.reason) == ["third", "second", "first"]
+
+      assert Enum.map(events, & &1.reason) == [
+               %RuntimeError{message: "third"},
+               "second",
+               %ArgumentError{message: "first"}
+             ]
     end
   end
 
@@ -58,8 +73,10 @@ defmodule TowerDB.EventsTest do
     test "deletes an existing event" do
       {:ok, event} =
         Events.create_event(%{
+          similarity_id: 99,
           datetime: ~U[2026-04-16 12:00:00.000000Z],
-          level: :error,
+          level: :warning,
+          kind: :message,
           reason: "to be deleted"
         })
 
