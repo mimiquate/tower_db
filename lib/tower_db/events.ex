@@ -38,6 +38,9 @@ defmodule TowerDB.Events do
       {:level, value}, dynamic when not is_nil(value) ->
         dynamic([e], ^dynamic and e.level == ^value)
 
+      {:datetime_range, {from, to}}, dynamic ->
+        dynamic([e], ^dynamic and e.datetime >= ^from and e.datetime <= ^to)
+
       {_, _}, dynamic ->
         dynamic
     end)
