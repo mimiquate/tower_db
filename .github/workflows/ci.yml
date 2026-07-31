@@ -1,0 +1,60 @@
+name: CI
+on:
+  pull_request:
+  push:
+
+jobs:
+  main:
+    timeout-minutes: 8
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - elixir: '1.20'
+            erlang: '29.0.2'
+            lint: true
+          - elixir: '1.19'
+            erlang: '28.5.0.2'
+          - elixir: '1.18'
+            erlang: '27.3.4.13'
+          - elixir: '1.17'
+            erlang: '26.2.5.21'
+          - elixir: '1.16'
+            erlang: '25.3.2.21'
+          - elixir: '1.15'
+            erlang: '25.3.2.21'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      POSTGRES_URL: postgres://postgres:postgres@localhost:5432/tower_db_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v6
+        if: ${{ ! matrix.lint }}
+        with:
+          path: |
+            _build
+            deps
+          key: ${{ runner.os }}-${{ matrix.elixir }}-${{ matrix.erlang }}-${{ hashFiles('mix.lock') }}
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.erlang }}
+          elixir-version: ${{ matrix.elixir }}
+      - run: mix deps.get --check-locked
+      - run: mix format --check-formatted
+        if: ${{ matrix.lint }}
+      - run: mix deps.unlock --check-unused
+        if: ${{ matrix.lint }}
+      - run: mix compile --warnings-as-errors
+      - run: mix test
