@@ -42,16 +42,11 @@ defmodule TowerDB.Event do
   end
 
   defp put_normalized_reason(changeset) do
-    case get_change(changeset, :reason) do
-      nil ->
-        changeset
-
-      reason ->
-        kind = get_field(changeset, :kind)
-        stacktrace = get_field(changeset, :stacktrace) || []
-        normalized_reason = format_reason(kind, reason, stacktrace)
-        put_change(changeset, :normalized_reason, normalized_reason)
-    end
+    reason = get_field(changeset, :reason)
+    kind = get_field(changeset, :kind)
+    stacktrace = get_field(changeset, :stacktrace) || []
+    normalized_reason = format_reason(kind, reason, stacktrace)
+    put_change(changeset, :normalized_reason, normalized_reason)
   end
 
   # Exception.format/3 only handles :error, :exit, and :throw kinds.
