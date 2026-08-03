@@ -35,6 +35,9 @@ defmodule TowerDB.Events do
         search_term = "%#{value}%"
         dynamic([e], ^dynamic and ilike(e.normalized_reason, ^search_term))
 
+      {:level, value}, dynamic when not is_nil(value) ->
+        dynamic([e], ^dynamic and e.level == ^value)
+
       {_, _}, dynamic ->
         dynamic
     end)
