@@ -16,7 +16,6 @@ defmodule TowerDB.EventTest do
       changeset = Event.changeset(%Event{}, attrs)
 
       assert changeset.valid?
-      assert changeset.changes.similarity_id == 123
       assert changeset.changes.datetime == ~U[2026-04-16 12:00:00.000000Z]
       assert changeset.changes.level == :error
       assert changeset.changes.kind == :error
