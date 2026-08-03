@@ -13,6 +13,7 @@ defmodule TowerDB.Event do
 
     field(:kind, Ecto.Enum, values: [:error, :exit, :throw, :message])
     field(:reason, TowerDB.Types.Term)
+    field(:normalized_reason, :string)
     field(:stacktrace, TowerDB.Types.Term)
     field(:log_event, TowerDB.Types.Term)
     field(:plug_conn, TowerDB.Types.Term)
@@ -37,5 +38,24 @@ defmodule TowerDB.Event do
       :by
     ])
     |> validate_required([:similarity_id, :datetime, :level, :kind, :reason])
+    |> put_normalized_reason()
   end
+
+  defp put_normalized_reason(changeset) do
+    if changeset.valid? do
+      kind = get_field(changeset, :kind)
+      reason = get_field(changeset, :reason)
+      stacktrace = get_field(changeset, :stacktrace) || []
+      normalized_reason = format_reason(kind, reason, stacktrace)
+      put_change(changeset, :normalized_reason, normalized_reason)
+    else
+      changeset
+    end
+  end
+
+  # Exception.format/3 only handles :error, :exit, and :throw kinds.
+  # :message is a Tower-specific kind for manually reported messages,
+  # so we handle it separately.
+  defp format_reason(:message, reason, _stacktrace), do: reason
+  defp format_reason(kind, reason, stacktrace), do: Exception.format(kind, reason, stacktrace)
 end

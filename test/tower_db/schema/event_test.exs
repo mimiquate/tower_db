@@ -27,6 +27,7 @@ defmodule TowerDB.EventTest do
       changeset = Event.changeset(%Event{}, %{})
 
       refute changeset.valid?
+      assert "can't be blank" in errors_on(changeset).similarity_id
       assert "can't be blank" in errors_on(changeset).datetime
       assert "can't be blank" in errors_on(changeset).level
       assert "can't be blank" in errors_on(changeset).kind

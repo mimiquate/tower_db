@@ -8,10 +8,12 @@ defmodule TowerDB.Events do
 
   def list_events(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
+    filters = Keyword.get(opts, :filters, [])
     limit = Keyword.get(opts, :limit, @default_limit)
     offset = Keyword.get(opts, :offset, 0)
 
     Event
+    |> where(^filter_where(filters))
     |> order_by(desc: :datetime)
     |> limit(^limit)
     |> offset(^offset)
@@ -20,9 +22,25 @@ defmodule TowerDB.Events do
 
   def count_events(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
+    filters = Keyword.get(opts, :filters, [])
 
     Event
+    |> where(^filter_where(filters))
     |> repo.aggregate(:count)
+  end
+
+  defp filter_where(filters) do
+    Enum.reduce(filters, dynamic(true), fn
+      {:search, value}, dynamic when value != "" ->
+        search_term = "%#{value}%"
+        dynamic([e], ^dynamic and ilike(e.normalized_reason, ^search_term))
+
+      {:level, value}, dynamic when not is_nil(value) ->
+        dynamic([e], ^dynamic and e.level == ^value)
+
+      {_, _}, dynamic ->
+        dynamic
+    end)
   end
 
   def get_event(id, opts \\ []) do
