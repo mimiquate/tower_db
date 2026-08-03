@@ -7,8 +7,6 @@ defmodule TowerDB.Migration.V03 do
     alter table(:tower_db_events) do
       add(:normalized_reason, :text)
     end
-
-    create_if_not_exists(index(:tower_db_events, [:normalized_reason]))
   end
 
   def down do
