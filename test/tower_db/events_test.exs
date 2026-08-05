@@ -248,6 +248,184 @@ defmodule TowerDB.EventsTest do
                message: "connection is not available"
              }
     end
+
+    test "filters events by datetime range" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 08:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "before range"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "inside range"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 3,
+          datetime: ~U[2026-05-08 14:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "after range"}
+        })
+
+      from = ~U[2026-05-08 09:00:00.000000Z]
+      to = ~U[2026-05-08 12:00:00.000000Z]
+
+      events = Events.list_events(filters: [datetime_range: {from, to}])
+
+      assert length(events) == 1
+      assert hd(events).reason == %RuntimeError{message: "inside range"}
+    end
+
+    test "datetime range is inclusive on both ends" do
+      from = ~U[2026-05-08 09:00:00.000000Z]
+      to = ~U[2026-05-08 12:00:00.000000Z]
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: from,
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "at from"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: to,
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "at to"}
+        })
+
+      events = Events.list_events(filters: [datetime_range: {from, to}])
+
+      assert length(events) == 2
+    end
+
+    test "returns empty list when no events match datetime range" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 08:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "outside range"}
+        })
+
+      from = ~U[2026-05-08 09:00:00.000000Z]
+      to = ~U[2026-05-08 12:00:00.000000Z]
+
+      events = Events.list_events(filters: [datetime_range: {from, to}])
+
+      assert events == []
+    end
+
+    test "filters events by datetime range and level" do
+      from = ~U[2026-05-08 09:00:00.000000Z]
+      to = ~U[2026-05-08 12:00:00.000000Z]
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "matches both"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %RuntimeError{message: "wrong level"}
+        })
+
+      events = Events.list_events(filters: [datetime_range: {from, to}, level: :error])
+
+      assert length(events) == 1
+      assert hd(events).reason == %RuntimeError{message: "matches both"}
+    end
+
+    test "filters events by datetime range and search term" do
+      from = ~U[2026-05-08 09:00:00.000000Z]
+      to = ~U[2026-05-08 12:00:00.000000Z]
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "database connection failed"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "memory usage high"}
+        })
+
+      events = Events.list_events(filters: [datetime_range: {from, to}, search: "database"])
+
+      assert length(events) == 1
+      assert hd(events).reason == %RuntimeError{message: "database connection failed"}
+    end
+
+    test "filters events by datetime range, level, and search term" do
+      from = ~U[2026-05-08 09:00:00.000000Z]
+      to = ~U[2026-05-08 12:00:00.000000Z]
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "database timeout"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %RuntimeError{message: "database timeout"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 3,
+          datetime: ~U[2026-05-08 14:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "database timeout"}
+        })
+
+      events =
+        Events.list_events(
+          filters: [datetime_range: {from, to}, level: :error, search: "timeout"]
+        )
+
+      assert length(events) == 1
+      assert hd(events).similarity_id == 1
+    end
   end
 
   describe "delete_event/2" do
