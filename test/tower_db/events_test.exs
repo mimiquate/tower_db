@@ -444,4 +444,42 @@ defmodule TowerDB.EventsTest do
       assert Events.list_events() == []
     end
   end
+
+  describe "count_distinct_similarity_ids/1" do
+    test "counts distinct similarity_ids, not total rows" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "first occurrence of error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "second occurrence of error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "error B"}
+        })
+
+      assert Events.count_distinct_similarity_ids() == 2
+      assert Events.count_events() == 3
+    end
+
+    test "returns 0 when there are no events" do
+      assert Events.count_distinct_similarity_ids() == 0
+    end
+  end
 end
