@@ -46,6 +46,9 @@ defmodule TowerDB.Events do
       {:level, value}, dynamic when not is_nil(value) ->
         dynamic([e], ^dynamic and e.level == ^value)
 
+      {:similarity_id, value}, dynamic when not is_nil(value) ->
+        dynamic([e], ^dynamic and e.similarity_id == ^value)
+
       {:datetime_range, {from, to}}, dynamic ->
         dynamic([e], ^dynamic and e.datetime >= ^from and e.datetime <= ^to)
 

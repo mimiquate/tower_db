@@ -212,6 +212,70 @@ defmodule TowerDB.EventsTest do
       assert events == []
     end
 
+    test "filters events by similarity_id" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %DBConnection.ConnectionError{message: "connection is not available"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "invalid argument"}
+        })
+
+      events = Events.list_events(filters: [similarity_id: 1])
+
+      assert length(events) == 1
+      assert hd(events).similarity_id == 1
+    end
+
+    test "returns all events when similarity_id filter is nil" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %DBConnection.ConnectionError{message: "connection is not available"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "invalid argument"}
+        })
+
+      events = Events.list_events(filters: [similarity_id: nil])
+
+      assert length(events) == 2
+    end
+
+    test "returns empty list when no events match similarity_id filter" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %DBConnection.ConnectionError{message: "connection is not available"}
+        })
+
+      events = Events.list_events(filters: [similarity_id: 2])
+
+      assert events == []
+    end
+
     test "filters events by level and search term" do
       {:ok, _} =
         Events.create_event(%{
