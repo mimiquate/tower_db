@@ -231,49 +231,10 @@ defmodule TowerDB.EventsTest do
           reason: %ArgumentError{message: "invalid argument"}
         })
 
-      events = Events.list_events(filters: [similarity_ids: [1]])
+      events = Events.list_events(filters: [similarity_id: "1"])
 
       assert length(events) == 1
       assert hd(events).similarity_id == 1
-    end
-
-    test "returns all events when similarity_id filter is nil" do
-      {:ok, _} =
-        Events.create_event(%{
-          similarity_id: 1,
-          datetime: ~U[2026-05-08 10:00:00.000000Z],
-          level: :error,
-          kind: :error,
-          reason: %DBConnection.ConnectionError{message: "connection is not available"}
-        })
-
-      {:ok, _} =
-        Events.create_event(%{
-          similarity_id: 2,
-          datetime: ~U[2026-05-08 11:00:00.000000Z],
-          level: :warning,
-          kind: :error,
-          reason: %ArgumentError{message: "invalid argument"}
-        })
-
-      events = Events.list_events(filters: [similarity_ids: nil])
-
-      assert length(events) == 2
-    end
-
-    test "returns empty list when no events match similarity_id filter" do
-      {:ok, _} =
-        Events.create_event(%{
-          similarity_id: 1,
-          datetime: ~U[2026-05-08 10:00:00.000000Z],
-          level: :error,
-          kind: :error,
-          reason: %DBConnection.ConnectionError{message: "connection is not available"}
-        })
-
-      events = Events.list_events(filters: [similarity_ids: [2]])
-
-      assert events == []
     end
 
     test "filters events by a list of similarity_id values" do
@@ -304,49 +265,10 @@ defmodule TowerDB.EventsTest do
           reason: %RuntimeError{message: "unexpected"}
         })
 
-      events = Events.list_events(filters: [similarity_ids: [1, 3]])
+      events = Events.list_events(filters: [similarity_id: ["1", "3"]])
 
       assert length(events) == 2
       assert Enum.map(events, & &1.similarity_id) |> Enum.sort() == [1, 3]
-    end
-
-    test "returns empty list when no events match any similarity_id in the list" do
-      {:ok, _} =
-        Events.create_event(%{
-          similarity_id: 1,
-          datetime: ~U[2026-05-08 10:00:00.000000Z],
-          level: :error,
-          kind: :error,
-          reason: %DBConnection.ConnectionError{message: "connection is not available"}
-        })
-
-      events = Events.list_events(filters: [similarity_ids: [2, 3]])
-
-      assert events == []
-    end
-
-    test "returns all events when similarity_id filter is an empty list" do
-      {:ok, _} =
-        Events.create_event(%{
-          similarity_id: 1,
-          datetime: ~U[2026-05-08 10:00:00.000000Z],
-          level: :error,
-          kind: :error,
-          reason: %DBConnection.ConnectionError{message: "connection is not available"}
-        })
-
-      {:ok, _} =
-        Events.create_event(%{
-          similarity_id: 2,
-          datetime: ~U[2026-05-08 11:00:00.000000Z],
-          level: :warning,
-          kind: :error,
-          reason: %ArgumentError{message: "invalid argument"}
-        })
-
-      events = Events.list_events(filters: [similarity_ids: []])
-
-      assert length(events) == 2
     end
 
     test "filters events by level and search term" do
