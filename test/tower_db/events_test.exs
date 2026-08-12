@@ -271,6 +271,34 @@ defmodule TowerDB.EventsTest do
       assert Enum.map(events, & &1.similarity_id) |> Enum.sort() == [1, 3]
     end
 
+    test "filter events when similarity_id list is empty and an empty string" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %DBConnection.ConnectionError{message: "connection is not available"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "invalid argument"}
+        })
+
+      events = Events.list_events(filters: [similarity_id: []])
+
+      assert length(events) == 2
+
+      events = Events.list_events(filters: [similarity_id: ""])
+
+      assert length(events) == 2
+    end
+
     test "filters events by level and search term" do
       {:ok, _} =
         Events.create_event(%{
