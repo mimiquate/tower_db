@@ -46,7 +46,8 @@ defmodule TowerDB.Events do
       {:level, value}, dynamic when not is_nil(value) ->
         dynamic([e], ^dynamic and e.level == ^value)
 
-      {:similarity_ids, value}, dynamic when is_list(value) and value != [] ->
+      {:similarity_id, value}, dynamic when is_binary(value) or is_list(value) ->
+        value = List.wrap(value)
         dynamic([e], ^dynamic and e.similarity_id in ^value)
 
       {:datetime_range, {from, to}}, dynamic ->
