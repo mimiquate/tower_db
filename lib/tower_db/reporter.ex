@@ -26,8 +26,11 @@ defmodule TowerDB.Reporter do
     }
 
     case TowerDB.Events.create_event(attrs) do
-      {:ok, event} -> Logger.info("Event id: #{event.id} was inserted")
-      {:error, reason} -> Logger.error("[TowerDB] Insert failed: #{inspect(reason)}")
+      {:error, reason} ->
+        Logger.error("[TowerDB] Error creating event in DB: #{inspect(reason)}")
+
+      {:ok, _event} ->
+        nil
     end
   end
 end
