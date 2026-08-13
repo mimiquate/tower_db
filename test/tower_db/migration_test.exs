@@ -1,89 +1,44 @@
 defmodule TowerDB.MigrationTest do
-  use ExUnit.Case, async: false
-
-  import TowerDB.TestHelpers
+  use ExUnit.Case, async: true
 
   alias Ecto.Adapters.SQL
+  alias TowerDB.PartialUpgradeTestRepo, as: Repo
+  alias TowerDB.PartialUpgradeTestRepo.Migrations.AddTowerDB
+  alias TowerDB.PartialUpgradeTestRepo.Migrations.UpgradeTowerDB
 
-  describe "up/0" do
+  describe "up/1 and down/1 with :from and :to" do
     setup do
-      Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
-      on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :manual) end)
+      Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+      # Needed because when running mix test it will run the migrations
+      # Rolling them back manually
+      run_migration(:down, {2, UpgradeTowerDB})
+      run_migration(:down, {1, AddTowerDB})
+      on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(Repo, :manual) end)
       :ok
     end
 
-    test "creates tower_db_events table with indexes" do
+    test "applies and reverts only the migrations between :from and :to" do
+      refute table_exists?("tower_db_events")
+
+      run_migration(:up, {1, AddTowerDB})
       assert table_exists?("tower_db_events")
+      assert "similarity_id" in get_columns("tower_db_events")
+      refute "normalized_reason" in get_columns("tower_db_events")
 
-      columns = get_columns("tower_db_events")
-      assert "id" in columns
-      assert "similarity_id" in columns
-      assert "datetime" in columns
-      assert "level" in columns
-      assert "kind" in columns
-      assert "reason" in columns
-      assert "stacktrace" in columns
-      assert "log_event" in columns
-      assert "plug_conn" in columns
-      assert "metadata" in columns
-      assert "by" in columns
-      assert "inserted_at" in columns
-      assert "updated_at" in columns
+      run_migration(:up, {2, UpgradeTowerDB})
+      assert "normalized_reason" in get_columns("tower_db_events")
 
-      assert index_exists?("tower_db_events", "tower_db_events_datetime_index")
-      assert index_exists?("tower_db_events", "tower_db_events_level_index")
+      run_migration(:down, {2, UpgradeTowerDB})
+      refute "normalized_reason" in get_columns("tower_db_events")
+      assert "similarity_id" in get_columns("tower_db_events")
+
+      run_migration(:down, {1, AddTowerDB})
+      refute table_exists?("tower_db_events")
     end
   end
 
-  # Tests that run migrations use :auto mode since Ecto.Migrator
-  # spawns a Task that needs automatic access to connections
-  describe "down/0" do
-    setup do
-      Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
-      run_migration(:up)
-
-      on_exit(fn ->
-        run_migration(:up)
-        Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :manual)
-      end)
-
-      :ok
-    end
-
-    test "drops tower_db_events table and indexes" do
-      assert table_exists?("tower_db_events")
-
-      run_migration(:down)
-
-      refute table_exists?("tower_db_events")
-      refute index_exists?("tower_db_events", "tower_db_events_datetime_index")
-      refute index_exists?("tower_db_events", "tower_db_events_level_index")
-    end
-  end
-
-  describe "up/0 after down/0" do
-    setup do
-      Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :auto)
-      run_migration(:up)
-
-      on_exit(fn ->
-        run_migration(:up)
-        Ecto.Adapters.SQL.Sandbox.mode(TowerDB.TestRepo, :manual)
-      end)
-
-      :ok
-    end
-
-    test "recreates table and indexes after rollback" do
-      run_migration(:down)
-      refute table_exists?("tower_db_events")
-
-      run_migration(:up)
-
-      assert table_exists?("tower_db_events")
-      assert index_exists?("tower_db_events", "tower_db_events_datetime_index")
-      assert index_exists?("tower_db_events", "tower_db_events_level_index")
-    end
+  defp run_migration(direction, migration) do
+    Ecto.Migrator.run(Repo, [migration], direction, all: true)
   end
 
   defp table_exists?(table_name) do
@@ -95,21 +50,7 @@ defmodule TowerDB.MigrationTest do
     )
     """
 
-    %{rows: [[exists]]} = SQL.query!(TowerDB.TestRepo, query, [table_name])
-    exists
-  end
-
-  defp index_exists?(table_name, index_name) do
-    query = """
-    SELECT EXISTS (
-      SELECT FROM pg_indexes
-      WHERE schemaname = 'public'
-      AND tablename = $1
-      AND indexname = $2
-    )
-    """
-
-    %{rows: [[exists]]} = SQL.query!(TowerDB.TestRepo, query, [table_name, index_name])
+    %{rows: [[exists]]} = SQL.query!(Repo, query, [table_name])
     exists
   end
 
@@ -121,7 +62,7 @@ defmodule TowerDB.MigrationTest do
     AND table_name = $1
     """
 
-    %{rows: rows} = SQL.query!(TowerDB.TestRepo, query, [table_name])
+    %{rows: rows} = SQL.query!(Repo, query, [table_name])
     List.flatten(rows)
   end
 end

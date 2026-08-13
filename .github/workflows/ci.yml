@@ -38,6 +38,7 @@ jobs:
           --health-retries 5
     env:
       POSTGRES_URL: postgres://postgres:postgres@localhost:5432/tower_db_test
+      PARTIAL_UPGRADE_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/tower_db_test_partial_upgrade
     steps:
       - uses: actions/checkout@v7
       - uses: actions/cache@v6

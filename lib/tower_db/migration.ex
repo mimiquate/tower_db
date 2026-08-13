@@ -15,26 +15,38 @@ defmodule TowerDB.Migration do
       defmodule MyApp.Repo.Migrations.AddTowerDB do
         use Ecto.Migration
 
-        def up, do: TowerDB.Migration.up()
-        def down, do: TowerDB.Migration.down()
+        def up, do: TowerDB.Migration.up(from: 0, to: 4)
+        def down, do: TowerDB.Migration.down(from: 4, to: 0)
       end
   """
 
   use Ecto.Migration
 
-  @spec up() :: :ok
-  def up do
-    TowerDB.Migration.V01.up()
-    TowerDB.Migration.V02.up()
-    TowerDB.Migration.V03.up()
-    TowerDB.Migration.V04.up()
+  @spec up(keyword()) :: :ok
+  def up(opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+
+    migrate(:up, (from + 1)..to//1)
   end
 
-  @spec down() :: :ok
-  def down do
-    TowerDB.Migration.V04.down()
-    TowerDB.Migration.V03.down()
-    TowerDB.Migration.V02.down()
-    TowerDB.Migration.V01.down()
+  @spec down(keyword()) :: :ok
+  def down(opts) do
+    from = Keyword.fetch!(opts, :from)
+    to = Keyword.fetch!(opts, :to)
+
+    migrate(:down, from..(to + 1)//-1)
+  end
+
+  defp migrate(direction, range) do
+    for index <- range do
+      pad_idx = String.pad_leading(to_string(index), 2, "0")
+
+      [__MODULE__, "V#{pad_idx}"]
+      |> Module.concat()
+      |> apply(direction, [])
+    end
+
+    :ok
   end
 end
