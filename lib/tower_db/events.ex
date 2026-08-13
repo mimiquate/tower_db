@@ -31,8 +31,10 @@ defmodule TowerDB.Events do
 
   def count_distinct_similarity_ids(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
+    filters = Keyword.get(opts, :filters, [])
 
     Event
+    |> where(^filter_where(filters))
     |> select([e], count(e.similarity_id, :distinct))
     |> repo.one()
   end
