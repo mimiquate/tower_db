@@ -540,5 +540,103 @@ defmodule TowerDB.EventsTest do
     test "returns 0 when there are no events" do
       assert Events.count_distinct_similarity_ids() == 0
     end
+
+    test "counts only distinct similarity_ids matching the given filters" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "first occurrence of error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "second occurrence of error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "error B"}
+        })
+
+      assert Events.count_distinct_similarity_ids(filters: [level: :error]) == 1
+      assert Events.count_distinct_similarity_ids(filters: [similarity_id: "2"]) == 1
+      assert Events.count_distinct_similarity_ids(filters: []) == 2
+      assert Events.count_distinct_similarity_ids(filters: [search: "first occurrence"]) == 1
+
+      from = ~U[2026-05-08 09:00:00.000000Z]
+      to = ~U[2026-05-08 12:00:00.000000Z]
+
+      assert Events.count_distinct_similarity_ids(filters: [datetime_range: {from, to}]) == 2
+    end
+
+    test "combines search, level, similarity_id and datetime_range filters together" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "database timeout"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "database timeout again"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 10:30:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %RuntimeError{message: "database timeout"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 3,
+          datetime: ~U[2026-05-08 10:30:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %ArgumentError{message: "invalid argument"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 20:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "database timeout outside range"}
+        })
+
+      from = ~U[2026-05-08 09:00:00.000000Z]
+      to = ~U[2026-05-08 12:00:00.000000Z]
+
+      filters = [
+        search: "database",
+        level: :error,
+        similarity_id: ["1", "2"],
+        datetime_range: {from, to}
+      ]
+
+      assert Events.count_distinct_similarity_ids(filters: filters) == 1
+    end
   end
 end
