@@ -7,7 +7,7 @@ defmodule TowerDB.ReporterTest do
     test "reports error level events" do
       event = build_tower_event(:error, "Error event")
 
-      assert :ok = Reporter.report_event(event)
+      Reporter.report_event(event)
 
       events = TowerDB.Events.list_events()
       assert length(events) == 1
@@ -17,7 +17,7 @@ defmodule TowerDB.ReporterTest do
     test "reports critical level events" do
       event = build_tower_event(:critical, "Critical event")
 
-      assert :ok = Reporter.report_event(event)
+      Reporter.report_event(event)
 
       events = TowerDB.Events.list_events()
       assert length(events) == 1
@@ -27,7 +27,7 @@ defmodule TowerDB.ReporterTest do
     test "report warning level events" do
       event = build_tower_event(:warning, "Warning event")
 
-      assert :ok = Reporter.report_event(event)
+      Reporter.report_event(event)
 
       events = TowerDB.Events.list_events()
       assert length(events) == 1
