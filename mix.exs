@@ -28,9 +28,8 @@ defmodule TowerDB.MixProject do
   defp deps do
     [
       {:tower, "~> 0.7"},
-      {:ecto_sql, "~> 3.10"},
-      {:postgrex, ">= 0.0.0", optional: true},
-      {:jason, "~> 1.4", optional: true}
+      {:ecto_sql, "~> 3.12"},
+      {:postgrex, "~> 0.17"}
     ]
   end
 
