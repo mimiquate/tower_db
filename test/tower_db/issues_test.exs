@@ -114,6 +114,43 @@ defmodule TowerDB.IssuesTest do
     end
   end
 
+  describe "get_issue/2" do
+    test "returns the issue matching the given id" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "first occurrence of error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "second occurrence of error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "error B"}
+        })
+
+      issue = Issues.get_issue(1)
+
+      assert issue.id == 1
+      assert issue.count_events == 2
+      assert issue.last_event.reason == %RuntimeError{message: "second occurrence of error A"}
+    end
+  end
+
   describe "count_issues/1" do
     test "counts distinct similarity_ids, not total events, and respects filters" do
       {:ok, _} =

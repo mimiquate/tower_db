@@ -29,6 +29,13 @@ defmodule TowerDB.Issues do
     |> repo.all()
   end
 
+  def get_issue(id, opts \\ []) do
+    opts
+    |> Keyword.put(:filters, similarity_id: id)
+    |> list_issues()
+    |> List.first()
+  end
+
   def count_issues(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
     filters = Keyword.get(opts, :filters, [])
@@ -48,7 +55,8 @@ defmodule TowerDB.Issues do
       {:level, value}, dynamic when not is_nil(value) ->
         dynamic([e], ^dynamic and e.level == ^value)
 
-      {:similarity_id, value}, dynamic when is_binary(value) or is_list(value) ->
+      {:similarity_id, value}, dynamic
+      when is_binary(value) or is_list(value) or is_integer(value) ->
         value = List.wrap(value)
         dynamic([e], ^dynamic and e.similarity_id in ^value)
 
