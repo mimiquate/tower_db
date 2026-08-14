@@ -1,12 +1,13 @@
-defmodule TowerDB.Events do
+defmodule TowerDB.Issues do
   import Ecto.Query
 
   alias TowerDB.Event
+  alias TowerDB.Issue
   alias TowerDB.Repo
 
   @default_limit 20
 
-  def list_events(opts \\ []) do
+  def list_issues(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
     filters = Keyword.get(opts, :filters, [])
     limit = Keyword.get(opts, :limit, @default_limit)
@@ -14,19 +15,35 @@ defmodule TowerDB.Events do
 
     Event
     |> where(^filter_where(filters))
-    |> order_by(desc: :datetime)
+    |> distinct([e], e.similarity_id)
+    |> order_by([e], desc: e.datetime)
     |> limit(^limit)
     |> offset(^offset)
+    |> select([e], %Issue{
+      id: e.similarity_id,
+      count_events: over(count(e.id), partition_by: e.similarity_id),
+      first_seen: over(min(e.datetime), partition_by: e.similarity_id),
+      last_seen: over(max(e.datetime), partition_by: e.similarity_id),
+      last_event: e
+    })
     |> repo.all()
   end
 
-  def count_events(opts \\ []) do
+  def get_issue(id, opts \\ []) do
+    opts
+    |> Keyword.put(:filters, similarity_id: id)
+    |> list_issues()
+    |> List.first()
+  end
+
+  def count_issues(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
     filters = Keyword.get(opts, :filters, [])
 
     Event
     |> where(^filter_where(filters))
-    |> repo.aggregate(:count)
+    |> select([e], count(e.similarity_id, :distinct))
+    |> repo.one()
   end
 
   defp filter_where(filters) do
@@ -38,7 +55,8 @@ defmodule TowerDB.Events do
       {:level, value}, dynamic when not is_nil(value) ->
         dynamic([e], ^dynamic and e.level == ^value)
 
-      {:similarity_id, value}, dynamic when is_binary(value) or is_list(value) ->
+      {:similarity_id, value}, dynamic
+      when is_binary(value) or is_list(value) or is_integer(value) ->
         value = List.wrap(value)
         dynamic([e], ^dynamic and e.similarity_id in ^value)
 
@@ -48,25 +66,5 @@ defmodule TowerDB.Events do
       {_, _}, dynamic ->
         dynamic
     end)
-  end
-
-  def get_event(id, opts \\ []) do
-    repo = Keyword.get(opts, :repo) || Repo.repo()
-
-    repo.get(Event, id)
-  end
-
-  def create_event(attrs, opts \\ []) do
-    repo = Keyword.get(opts, :repo) || Repo.repo()
-
-    %Event{}
-    |> Event.changeset(attrs)
-    |> repo.insert()
-  end
-
-  def delete_event(%Event{} = event, opts \\ []) do
-    repo = Keyword.get(opts, :repo) || Repo.repo()
-
-    repo.delete(event)
   end
 end
