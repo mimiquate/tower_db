@@ -29,16 +29,6 @@ defmodule TowerDB.Events do
     |> repo.aggregate(:count)
   end
 
-  def count_distinct_similarity_ids(opts \\ []) do
-    repo = Keyword.get(opts, :repo) || Repo.repo()
-    filters = Keyword.get(opts, :filters, [])
-
-    Event
-    |> where(^filter_where(filters))
-    |> select([e], count(e.similarity_id, :distinct))
-    |> repo.one()
-  end
-
   defp filter_where(filters) do
     Enum.reduce(filters, dynamic(true), fn
       {:search, value}, dynamic when value != "" ->
