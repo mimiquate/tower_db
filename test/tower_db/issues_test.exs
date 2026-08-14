@@ -50,5 +50,32 @@ defmodule TowerDB.IssuesTest do
       assert issue_b.last_seen == ~U[2026-05-08 11:00:00.000000Z]
       assert issue_b.last_event.reason == %ArgumentError{message: "error B"}
     end
+
+    test "returns all issues without filters and only matching ones with a search filter" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :message,
+          reason: "Database connection failed"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          kind: :message,
+          reason: "Memory usage high"
+        })
+
+      assert length(Issues.list_issues()) == 2
+
+      issues = Issues.list_issues(filters: [search: "database"])
+
+      assert length(issues) == 1
+      assert hd(issues).similarity_id == 1
+    end
   end
 end
