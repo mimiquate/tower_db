@@ -77,5 +77,74 @@ defmodule TowerDB.IssuesTest do
       assert length(issues) == 1
       assert hd(issues).similarity_id == 1
     end
+
+    test "paginates results with limit and offset" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "error B"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 3,
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "error C"}
+        })
+
+      page_1 = Issues.list_issues(limit: 2, offset: 0)
+      page_2 = Issues.list_issues(limit: 2, offset: 2)
+
+      assert Enum.map(page_1, & &1.similarity_id) == [1, 2]
+      assert Enum.map(page_2, & &1.similarity_id) == [3]
+    end
+  end
+
+  describe "count_issues/1" do
+    test "counts distinct similarity_ids, not total events, and respects filters" do
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "first occurrence of error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "second occurrence of error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "error B"}
+        })
+
+      assert Issues.count_issues() == 2
+      assert Issues.count_issues(filters: [level: :warning]) == 1
+    end
   end
 end

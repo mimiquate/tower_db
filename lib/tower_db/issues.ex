@@ -5,14 +5,20 @@ defmodule TowerDB.Issues do
   alias TowerDB.Issue
   alias TowerDB.Repo
 
+  @default_limit 20
+
   def list_issues(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
     filters = Keyword.get(opts, :filters, [])
+    limit = Keyword.get(opts, :limit, @default_limit)
+    offset = Keyword.get(opts, :offset, 0)
 
     Event
     |> where(^filter_where(filters))
     |> distinct([e], e.similarity_id)
     |> order_by([e], asc: e.similarity_id, desc: e.datetime)
+    |> limit(^limit)
+    |> offset(^offset)
     |> select([e], %Issue{
       similarity_id: e.similarity_id,
       count_occurrences: over(count(e.id), partition_by: e.similarity_id),
@@ -21,6 +27,16 @@ defmodule TowerDB.Issues do
       last_event: e
     })
     |> repo.all()
+  end
+
+  def count_issues(opts \\ []) do
+    repo = Keyword.get(opts, :repo) || Repo.repo()
+    filters = Keyword.get(opts, :filters, [])
+
+    Event
+    |> where(^filter_where(filters))
+    |> select([e], count(e.similarity_id, :distinct))
+    |> repo.one()
   end
 
   defp filter_where(filters) do
