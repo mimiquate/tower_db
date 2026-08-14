@@ -37,15 +37,15 @@ defmodule TowerDB.IssuesTest do
 
       assert length(issues) == 2
 
-      issue_a = Enum.find(issues, &(&1.similarity_id == 1))
-      issue_b = Enum.find(issues, &(&1.similarity_id == 2))
+      issue_a = Enum.find(issues, &(&1.id == 1))
+      issue_b = Enum.find(issues, &(&1.id == 2))
 
-      assert issue_a.count_occurrences == 2
+      assert issue_a.count_events == 2
       assert issue_a.first_seen == ~U[2026-05-08 10:00:00.000000Z]
       assert issue_a.last_seen == ~U[2026-05-08 12:00:00.000000Z]
       assert issue_a.last_event.reason == %RuntimeError{message: "second occurrence of error A"}
 
-      assert issue_b.count_occurrences == 1
+      assert issue_b.count_events == 1
       assert issue_b.first_seen == ~U[2026-05-08 11:00:00.000000Z]
       assert issue_b.last_seen == ~U[2026-05-08 11:00:00.000000Z]
       assert issue_b.last_event.reason == %ArgumentError{message: "error B"}
@@ -75,7 +75,7 @@ defmodule TowerDB.IssuesTest do
       issues = Issues.list_issues(filters: [search: "database"])
 
       assert length(issues) == 1
-      assert hd(issues).similarity_id == 1
+      assert hd(issues).id == 1
     end
 
     test "paginates results with limit and offset" do
@@ -109,8 +109,8 @@ defmodule TowerDB.IssuesTest do
       page_1 = Issues.list_issues(limit: 2, offset: 0)
       page_2 = Issues.list_issues(limit: 2, offset: 2)
 
-      assert Enum.map(page_1, & &1.similarity_id) == [1, 2]
-      assert Enum.map(page_2, & &1.similarity_id) == [3]
+      assert Enum.map(page_1, & &1.id) == [1, 2]
+      assert Enum.map(page_2, & &1.id) == [3]
     end
   end
 

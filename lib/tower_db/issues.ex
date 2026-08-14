@@ -16,12 +16,12 @@ defmodule TowerDB.Issues do
     Event
     |> where(^filter_where(filters))
     |> distinct([e], e.similarity_id)
-    |> order_by([e], asc: e.similarity_id, desc: e.datetime)
+    |> order_by([e], desc: e.datetime)
     |> limit(^limit)
     |> offset(^offset)
     |> select([e], %Issue{
-      similarity_id: e.similarity_id,
-      count_occurrences: over(count(e.id), partition_by: e.similarity_id),
+      id: e.similarity_id,
+      count_events: over(count(e.id), partition_by: e.similarity_id),
       first_seen: over(min(e.datetime), partition_by: e.similarity_id),
       last_seen: over(max(e.datetime), partition_by: e.similarity_id),
       last_event: e
