@@ -6,6 +6,7 @@ defmodule TowerDB.EventsTest do
   describe "create_event/1" do
     test "creates an event with valid attrs" do
       attrs = %{
+        id: UUIDv7.generate(),
         similarity_id: 12345,
         datetime: ~U[2026-04-16 12:00:00.000000Z],
         level: :error,
@@ -32,6 +33,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -41,6 +43,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 12:00:00.000000Z],
           level: :error,
@@ -50,6 +53,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 3,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -71,6 +75,7 @@ defmodule TowerDB.EventsTest do
     test "filters events by search term" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -80,6 +85,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -96,6 +102,7 @@ defmodule TowerDB.EventsTest do
     test "search is case insensitive" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -112,6 +119,7 @@ defmodule TowerDB.EventsTest do
     test "returns empty list when no events match search" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -127,6 +135,7 @@ defmodule TowerDB.EventsTest do
     test "returns all events when search is empty" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -136,6 +145,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -151,6 +161,7 @@ defmodule TowerDB.EventsTest do
     test "filters events by level" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -160,6 +171,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -176,6 +188,7 @@ defmodule TowerDB.EventsTest do
     test "returns all events when level filter is nil" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -185,6 +198,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -200,6 +214,7 @@ defmodule TowerDB.EventsTest do
     test "returns empty list when no events match level filter" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -215,6 +230,7 @@ defmodule TowerDB.EventsTest do
     test "filters events by similarity_id" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -224,6 +240,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -240,6 +257,7 @@ defmodule TowerDB.EventsTest do
     test "filters events by a list of similarity_id values" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -249,6 +267,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -258,6 +277,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 3,
           datetime: ~U[2026-05-08 12:00:00.000000Z],
           level: :warning,
@@ -274,6 +294,7 @@ defmodule TowerDB.EventsTest do
     test "filters events by level and search term" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -283,6 +304,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -292,6 +314,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 3,
           datetime: ~U[2026-05-08 12:00:00.000000Z],
           level: :error,
@@ -311,6 +334,7 @@ defmodule TowerDB.EventsTest do
     test "filters events by datetime range" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 08:00:00.000000Z],
           level: :error,
@@ -320,6 +344,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -329,6 +354,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 3,
           datetime: ~U[2026-05-08 14:00:00.000000Z],
           level: :error,
@@ -351,6 +377,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: from,
           level: :error,
@@ -360,6 +387,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: to,
           level: :error,
@@ -375,6 +403,7 @@ defmodule TowerDB.EventsTest do
     test "returns empty list when no events match datetime range" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 08:00:00.000000Z],
           level: :error,
@@ -396,6 +425,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -405,6 +435,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :warning,
@@ -424,6 +455,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -433,6 +465,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -452,6 +485,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -461,6 +495,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :warning,
@@ -470,6 +505,7 @@ defmodule TowerDB.EventsTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 3,
           datetime: ~U[2026-05-08 14:00:00.000000Z],
           level: :error,
@@ -491,6 +527,7 @@ defmodule TowerDB.EventsTest do
     test "deletes an existing event" do
       {:ok, event} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 99,
           datetime: ~U[2026-04-16 12:00:00.000000Z],
           level: :warning,

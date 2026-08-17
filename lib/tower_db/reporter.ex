@@ -13,6 +13,7 @@ defmodule TowerDB.Reporter do
 
   defp do_report_event(%Tower.Event{} = event) do
     attrs = %{
+      id: event.id,
       similarity_id: event.similarity_id,
       datetime: event.datetime,
       level: event.level,
