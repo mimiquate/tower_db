@@ -6,6 +6,7 @@ defmodule TowerDB.EventTest do
   describe "changeset/2" do
     test "valid with required fields" do
       attrs = %{
+        id: UUIDv7.generate(),
         similarity_id: 12345,
         datetime: ~U[2026-04-16 12:00:00.000000Z],
         level: :error,
@@ -27,6 +28,7 @@ defmodule TowerDB.EventTest do
       changeset = Event.changeset(%Event{}, %{})
 
       refute changeset.valid?
+      assert "can't be blank" in errors_on(changeset).id
       assert "can't be blank" in errors_on(changeset).similarity_id
       assert "can't be blank" in errors_on(changeset).datetime
       assert "can't be blank" in errors_on(changeset).level

@@ -3,6 +3,8 @@ defmodule TowerDB.Event do
 
   import Ecto.Changeset
 
+  @primary_key {:id, UUIDv7.Type, autogenerate: false}
+
   schema "tower_db_events" do
     field(:similarity_id, :integer)
     field(:datetime, :utc_datetime_usec)
@@ -26,6 +28,7 @@ defmodule TowerDB.Event do
   def changeset(event, attrs) do
     event
     |> cast(attrs, [
+      :id,
       :similarity_id,
       :datetime,
       :level,
@@ -37,7 +40,7 @@ defmodule TowerDB.Event do
       :metadata,
       :by
     ])
-    |> validate_required([:similarity_id, :datetime, :level, :kind, :reason])
+    |> validate_required([:id, :similarity_id, :datetime, :level, :kind, :reason])
     |> put_normalized_reason()
   end
 

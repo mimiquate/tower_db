@@ -73,7 +73,7 @@ defmodule TowerDB.ReporterTest do
 
   defp build_tower_event(level, message, opts \\ []) do
     %Tower.Event{
-      id: "test-#{System.unique_integer()}",
+      id: UUIDv7.generate(),
       similarity_id: :rand.uniform(100_000),
       datetime: Keyword.get(opts, :datetime, DateTime.utc_now()),
       level: level,

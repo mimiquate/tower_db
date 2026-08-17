@@ -4,7 +4,8 @@ defmodule TowerDB.Migration.V01 do
   use Ecto.Migration
 
   def up do
-    create_if_not_exists table(:tower_db_events) do
+    create_if_not_exists table(:tower_db_events, primary_key: false) do
+      add(:id, :uuid, primary_key: true)
       add(:datetime, :utc_datetime_usec, null: false)
       add(:level, :string, null: false)
       add(:reason, :binary, null: false)

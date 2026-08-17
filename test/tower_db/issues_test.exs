@@ -8,6 +8,7 @@ defmodule TowerDB.IssuesTest do
     test "lists distinct issues grouped by similarity_id" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -17,6 +18,7 @@ defmodule TowerDB.IssuesTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 12:00:00.000000Z],
           level: :error,
@@ -26,6 +28,7 @@ defmodule TowerDB.IssuesTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -54,6 +57,7 @@ defmodule TowerDB.IssuesTest do
     test "returns all issues without filters and only matching ones with a search filter" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -63,6 +67,7 @@ defmodule TowerDB.IssuesTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -81,6 +86,7 @@ defmodule TowerDB.IssuesTest do
     test "paginates results with limit and offset" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -90,6 +96,7 @@ defmodule TowerDB.IssuesTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -99,6 +106,7 @@ defmodule TowerDB.IssuesTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 3,
           datetime: ~U[2026-05-08 12:00:00.000000Z],
           level: :error,
@@ -118,6 +126,7 @@ defmodule TowerDB.IssuesTest do
     test "returns the issue matching the given id" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -127,6 +136,7 @@ defmodule TowerDB.IssuesTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 12:00:00.000000Z],
           level: :error,
@@ -136,6 +146,7 @@ defmodule TowerDB.IssuesTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :warning,
@@ -155,6 +166,7 @@ defmodule TowerDB.IssuesTest do
     test "counts distinct similarity_ids, not total events, and respects filters" do
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 10:00:00.000000Z],
           level: :error,
@@ -164,6 +176,7 @@ defmodule TowerDB.IssuesTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 1,
           datetime: ~U[2026-05-08 11:00:00.000000Z],
           level: :error,
@@ -173,6 +186,7 @@ defmodule TowerDB.IssuesTest do
 
       {:ok, _} =
         Events.create_event(%{
+          id: UUIDv7.generate(),
           similarity_id: 2,
           datetime: ~U[2026-05-08 12:00:00.000000Z],
           level: :warning,
