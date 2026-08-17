@@ -20,10 +20,7 @@ defmodule TowerDB.Reporter do
       kind: event.kind,
       reason: event.reason,
       stacktrace: event.stacktrace,
-      log_event: event.log_event,
-      plug_conn: event.plug_conn,
-      metadata: event.metadata,
-      by: if(event.by, do: inspect(event.by))
+      metadata: event.metadata
     }
 
     case TowerDB.Events.create_event(attrs) do

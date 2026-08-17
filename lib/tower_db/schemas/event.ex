@@ -17,10 +17,7 @@ defmodule TowerDB.Event do
     field(:reason, TowerDB.Types.Term)
     field(:normalized_reason, :string)
     field(:stacktrace, TowerDB.Types.Term)
-    field(:log_event, TowerDB.Types.Term)
-    field(:plug_conn, TowerDB.Types.Term)
     field(:metadata, TowerDB.Types.Term)
-    field(:by, :string)
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -35,10 +32,7 @@ defmodule TowerDB.Event do
       :kind,
       :reason,
       :stacktrace,
-      :log_event,
-      :plug_conn,
-      :metadata,
-      :by
+      :metadata
     ])
     |> validate_required([:id, :similarity_id, :datetime, :level, :kind, :reason])
     |> put_normalized_reason()
