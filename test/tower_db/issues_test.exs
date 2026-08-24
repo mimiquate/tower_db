@@ -117,8 +117,90 @@ defmodule TowerDB.IssuesTest do
       page_1 = Issues.list_issues(limit: 2, offset: 0)
       page_2 = Issues.list_issues(limit: 2, offset: 2)
 
-      assert Enum.map(page_1, & &1.id) == [1, 2]
-      assert Enum.map(page_2, & &1.id) == [3]
+      assert Enum.map(page_1, & &1.id) == [3, 2]
+      assert Enum.map(page_2, & &1.id) == [1]
+    end
+
+    test "orders issues by last_seen descending" do
+      {:ok, _} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "error B"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 3,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "error C"}
+        })
+
+      issues = Issues.list_issues()
+
+      assert Enum.map(issues, & &1.id) == [2, 3, 1]
+    end
+
+    test "count_events, first_seen and last_seen are not scoped to the datetime_range filter" do
+      now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+      outside_window = DateTime.add(now, -10, :day)
+      another_outside_window = DateTime.add(now, -5, :day)
+      inside_window = DateTime.add(now, -1, :hour)
+
+      {:ok, _} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 1,
+          datetime: outside_window,
+          level: :error,
+          kind: :message,
+          reason: "Older occurrence outside the filtered window"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 1,
+          datetime: another_outside_window,
+          level: :error,
+          kind: :message,
+          reason: "Another occurrence outside the filtered window"
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 1,
+          datetime: inside_window,
+          level: :error,
+          kind: :message,
+          reason: "Recent occurrence inside the filtered window"
+        })
+
+      datetime_range = {DateTime.add(now, -2, :hour), now}
+
+      [issue] = Issues.list_issues(filters: [datetime_range: datetime_range])
+
+      assert issue.count_events == 3
+      assert issue.first_seen == outside_window
+      assert issue.last_seen == inside_window
+      assert issue.last_event.reason == "Recent occurrence inside the filtered window"
     end
   end
 

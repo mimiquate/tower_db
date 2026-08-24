@@ -4,10 +4,10 @@ defmodule TowerDB.Migration.V06 do
   use Ecto.Migration
 
   def up do
-    create_if_not_exists(index(:tower_db_events, [:similarity_id]))
+    create(index(:tower_db_events, [:similarity_id, "datetime DESC"]))
   end
 
   def down do
-    drop_if_exists(index(:tower_db_events, [:similarity_id]))
+    drop(index(:tower_db_events, [:similarity_id, "datetime DESC"]))
   end
 end
