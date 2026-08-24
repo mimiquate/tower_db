@@ -6,24 +6,46 @@ defmodule TowerDB.Issues do
   alias TowerDB.Repo
 
   @default_limit 20
+  @occurrences_window_days 30
 
   def list_issues(opts \\ []) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
     filters = Keyword.get(opts, :filters, [])
     limit = Keyword.get(opts, :limit, @default_limit)
     offset = Keyword.get(opts, :offset, 0)
+    occurrences_since = DateTime.add(DateTime.utc_now(), -@occurrences_window_days, :day)
+
+    matching_similarity_ids =
+      Event
+      |> where(^filter_where(filters))
+      |> select([e], e.similarity_id)
+      |> distinct(true)
+
+    issue_data =
+      Event
+      |> where([e], e.similarity_id in subquery(matching_similarity_ids))
+      |> where([e], e.datetime >= ^occurrences_since)
+      |> distinct([e], e.similarity_id)
+      |> order_by([e], asc: e.similarity_id, desc: e.datetime)
+      |> select([e], %{
+        similarity_id: e.similarity_id,
+        last_event_id: e.id,
+        count_events: over(count(e.id), partition_by: e.similarity_id),
+        first_seen: over(min(e.datetime), partition_by: e.similarity_id),
+        last_seen: over(max(e.datetime), partition_by: e.similarity_id)
+      })
+      |> subquery()
 
     Event
-    |> where(^filter_where(filters))
-    |> distinct([e], e.similarity_id)
-    |> order_by([e], desc: e.datetime)
+    |> join(:inner, [e], issue in ^issue_data, on: issue.last_event_id == e.id)
+    |> order_by([_e, issue], desc: issue.last_seen)
     |> limit(^limit)
     |> offset(^offset)
-    |> select([e], %Issue{
-      id: e.similarity_id,
-      count_events: over(count(e.id), partition_by: e.similarity_id),
-      first_seen: over(min(e.datetime), partition_by: e.similarity_id),
-      last_seen: over(max(e.datetime), partition_by: e.similarity_id),
+    |> select([e, issue], %Issue{
+      id: issue.similarity_id,
+      count_events: issue.count_events,
+      first_seen: issue.first_seen,
+      last_seen: issue.last_seen,
       last_event: e
     })
     |> repo.all()
