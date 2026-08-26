@@ -4,6 +4,7 @@ defmodule TowerDB.MixProject do
   def project do
     [
       app: :tower_db,
+      description: "Error tracking and reporting to your database",
       version: "0.6.0",
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
@@ -36,7 +37,6 @@ defmodule TowerDB.MixProject do
 
   defp package do
     [
-      organization: "mimiquate",
       licenses: ["Apache-2.0"],
       links: %{}
     ]
