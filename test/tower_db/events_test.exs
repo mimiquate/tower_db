@@ -540,4 +540,43 @@ defmodule TowerDB.EventsTest do
       assert Events.list_events() == []
     end
   end
+
+  describe "delete_events/2" do
+    test "deletes only the events matching the given ids and returns the count" do
+      {:ok, event1} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 1,
+          datetime: ~U[2026-04-16 12:00:00.000000Z],
+          level: :warning,
+          kind: :message,
+          reason: "to be deleted 1"
+        })
+
+      {:ok, event2} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 2,
+          datetime: ~U[2026-04-16 12:00:00.000000Z],
+          level: :warning,
+          kind: :message,
+          reason: "to be deleted 2"
+        })
+
+      {:ok, kept_event} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 3,
+          datetime: ~U[2026-04-16 12:00:00.000000Z],
+          level: :warning,
+          kind: :message,
+          reason: "kept"
+        })
+
+      assert Events.delete_events([event1.id, event2.id]) == 2
+
+      remaining_ids = Events.list_events() |> Enum.map(& &1.id)
+      assert remaining_ids == [kept_event.id]
+    end
+  end
 end
