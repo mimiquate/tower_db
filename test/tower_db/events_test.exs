@@ -573,7 +573,7 @@ defmodule TowerDB.EventsTest do
           reason: "kept"
         })
 
-      assert Events.delete_events([event1.id, event2.id]) == 2
+      assert Events.delete_events([event1.id, event2.id]) == {2, nil}
 
       remaining_ids = Events.list_events() |> Enum.map(& &1.id)
       assert remaining_ids == [kept_event.id]

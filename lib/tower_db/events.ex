@@ -73,11 +73,8 @@ defmodule TowerDB.Events do
   def delete_events(ids, opts \\ []) when is_list(ids) do
     repo = Keyword.get(opts, :repo) || Repo.repo()
 
-    {count, _} =
-      Event
-      |> where([e], e.id in ^ids)
-      |> repo.delete_all()
-
-    count
+    Event
+    |> where([e], e.id in ^ids)
+    |> repo.delete_all()
   end
 end
