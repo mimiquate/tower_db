@@ -11,12 +11,14 @@ defmodule TowerDB.Events do
     filters = Keyword.get(opts, :filters, [])
     limit = Keyword.get(opts, :limit, @default_limit)
     offset = Keyword.get(opts, :offset, 0)
+    fields = Keyword.get(opts, :select, dynamic([e], e))
 
     Event
     |> where(^filter_where(filters))
     |> order_by(desc: :datetime)
     |> limit(^limit)
     |> offset(^offset)
+    |> select(^fields)
     |> repo.all()
   end
 

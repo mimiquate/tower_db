@@ -521,6 +521,32 @@ defmodule TowerDB.EventsTest do
       assert length(events) == 1
       assert hd(events).similarity_id == 1
     end
+
+    test "returns only the selected fields" do
+      {:ok, _} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :message,
+          reason: "some reason"
+        })
+
+      [event] = Events.list_events(select: [:datetime, :normalized_reason])
+
+      assert event.datetime == ~U[2026-05-08 10:00:00.000000Z]
+      assert event.normalized_reason == "some reason"
+      assert event.id == nil
+      assert event.similarity_id == nil
+      assert event.level == nil
+      assert event.kind == nil
+      assert event.reason == nil
+      assert event.stacktrace == nil
+      assert event.metadata == nil
+      assert event.inserted_at == nil
+      assert event.updated_at == nil
+    end
   end
 
   describe "delete_event/2" do
