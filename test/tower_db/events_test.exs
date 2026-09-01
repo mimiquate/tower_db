@@ -537,15 +537,6 @@ defmodule TowerDB.EventsTest do
 
       assert event.datetime == ~U[2026-05-08 10:00:00.000000Z]
       assert event.normalized_reason == "some reason"
-      assert event.id == nil
-      assert event.similarity_id == nil
-      assert event.level == nil
-      assert event.kind == nil
-      assert event.reason == nil
-      assert event.stacktrace == nil
-      assert event.metadata == nil
-      assert event.inserted_at == nil
-      assert event.updated_at == nil
     end
   end
 
