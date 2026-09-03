@@ -9,7 +9,7 @@ Add `tower_db` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tower_db, "~> 0.6.0"}
+    {:tower_db, "~> 0.7.0"}
   ]
 end
 ```
@@ -53,8 +53,8 @@ Then add the following content to the generated migration file:
 defmodule MyApp.Repo.Migrations.AddTowerDB do
   use Ecto.Migration
 
-  def up, do: TowerDB.Migration.up(from: 0, to: 5)
-  def down, do: TowerDB.Migration.down(from: 5, to: 0)
+  def up, do: TowerDB.Migration.up(from: 0, to: 6)
+  def down, do: TowerDB.Migration.down(from: 6, to: 0)
 end
 ```
 
