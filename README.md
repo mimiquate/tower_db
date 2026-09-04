@@ -2,6 +2,15 @@
 
 A [Tower](https://github.com/mimiquate/tower) reporter that stores errors and exceptions in a PostgreSQL database using Ecto.
 
+> [!WARNING]
+> **Not production ready.** TowerDB is under active development and its API may still change. We use it in several applications at [Mimiquate](https://mimiquate.com), but it hasn't yet reached the bar we'd consider production ready. Use it at your own risk.
+>
+> Features we're waiting on before calling it production ready:
+>
+> - Pruner
+> - Enable / Disable reporter via config var and via remote shell
+> - Performance test
+
 ## Installation
 
 Add `tower_db` to your list of dependencies in `mix.exs`:
