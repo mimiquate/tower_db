@@ -11,7 +11,7 @@ defmodule TowerDB.ReporterTest do
 
       events = TowerDB.Events.list_events()
       assert length(events) == 1
-      assert match?(%RuntimeError{message: "Error event"}, hd(events).reason)
+      assert hd(events).normalized_reason =~ "Error event"
     end
 
     test "reports critical level events" do
@@ -21,7 +21,7 @@ defmodule TowerDB.ReporterTest do
 
       events = TowerDB.Events.list_events()
       assert length(events) == 1
-      assert match?(%RuntimeError{message: "Critical event"}, hd(events).reason)
+      assert hd(events).normalized_reason =~ "Critical event"
     end
 
     test "report warning level events" do
@@ -50,7 +50,7 @@ defmodule TowerDB.ReporterTest do
 
       assert db_event.datetime == ~U[2026-05-08 12:00:00.000000Z]
       assert db_event.level == :error
-      assert db_event.reason == %RuntimeError{message: "Test error"}
+      assert db_event.normalized_reason =~ "Test error"
       assert db_event.stacktrace == stacktrace
       assert db_event.metadata == metadata
     end

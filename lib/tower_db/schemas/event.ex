@@ -14,7 +14,7 @@ defmodule TowerDB.Event do
     )
 
     field(:kind, Ecto.Enum, values: [:error, :exit, :throw, :message])
-    field(:reason, TowerDB.Types.Term)
+    field(:reason, :any, virtual: true)
     field(:normalized_reason, :string)
     field(:stacktrace, TowerDB.Types.Term)
     field(:metadata, TowerDB.Types.Term)
