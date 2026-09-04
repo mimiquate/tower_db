@@ -65,10 +65,10 @@ defmodule TowerDB.EventsTest do
 
       assert length(events) == 3
 
-      assert Enum.map(events, & &1.reason) == [
-               %RuntimeError{message: "third"},
+      assert Enum.map(events, & &1.normalized_reason) == [
+               "** (RuntimeError) third",
                "second",
-               %ArgumentError{message: "first"}
+               "** (ArgumentError) first"
              ]
     end
 
@@ -96,7 +96,7 @@ defmodule TowerDB.EventsTest do
       events = Events.list_events(filters: [search: "database"])
 
       assert length(events) == 1
-      assert hd(events).reason == "Database connection failed"
+      assert hd(events).normalized_reason == "Database connection failed"
     end
 
     test "search is case insensitive" do
@@ -113,7 +113,7 @@ defmodule TowerDB.EventsTest do
       events = Events.list_events(filters: [search: "database"])
 
       assert length(events) == 1
-      assert hd(events).reason == "DATABASE ERROR"
+      assert hd(events).normalized_reason == "DATABASE ERROR"
     end
 
     test "returns empty list when no events match search" do
@@ -326,9 +326,7 @@ defmodule TowerDB.EventsTest do
 
       assert length(events) == 1
 
-      assert hd(events).reason == %DBConnection.ConnectionError{
-               message: "connection is not available"
-             }
+      assert hd(events).normalized_reason =~ "connection is not available"
     end
 
     test "filters events by datetime range" do
@@ -368,7 +366,7 @@ defmodule TowerDB.EventsTest do
       events = Events.list_events(filters: [datetime_range: {from, to}])
 
       assert length(events) == 1
-      assert hd(events).reason == %RuntimeError{message: "inside range"}
+      assert hd(events).normalized_reason =~ "inside range"
     end
 
     test "datetime range is inclusive on both ends" do
@@ -446,7 +444,7 @@ defmodule TowerDB.EventsTest do
       events = Events.list_events(filters: [datetime_range: {from, to}, level: :error])
 
       assert length(events) == 1
-      assert hd(events).reason == %RuntimeError{message: "matches both"}
+      assert hd(events).normalized_reason =~ "matches both"
     end
 
     test "filters events by datetime range and search term" do
@@ -476,7 +474,7 @@ defmodule TowerDB.EventsTest do
       events = Events.list_events(filters: [datetime_range: {from, to}, search: "database"])
 
       assert length(events) == 1
-      assert hd(events).reason == %RuntimeError{message: "database connection failed"}
+      assert hd(events).normalized_reason =~ "database connection failed"
     end
 
     test "filters events by datetime range, level, and search term" do
