@@ -18,7 +18,7 @@ Add `tower_db` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tower_db, "~> 0.7.0"}
+    {:tower_db, "~> 0.8.0"}
   ]
 end
 ```

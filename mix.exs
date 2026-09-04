@@ -5,7 +5,7 @@ defmodule TowerDB.MixProject do
     [
       app: :tower_db,
       description: "Error tracking and reporting to your database",
-      version: "0.7.0",
+      version: "0.8.0",
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
