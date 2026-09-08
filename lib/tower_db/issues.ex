@@ -13,10 +13,13 @@ defmodule TowerDB.Issues do
     limit = Keyword.get(opts, :limit, @default_limit)
     offset = Keyword.get(opts, :offset, 0)
 
+    {datetime_range, event_filters} = Keyword.pop(filters, :datetime_range)
+
     ordered_ids =
       Event
-      |> where(^filter_where(filters))
+      |> where(^filter_where(event_filters))
       |> group_by([e], e.similarity_id)
+      |> having(^last_seen_in_range(datetime_range))
       |> order_by([e], desc: max(e.datetime))
       |> limit(^limit)
       |> offset(^offset)
@@ -52,9 +55,15 @@ defmodule TowerDB.Issues do
     repo = Keyword.get(opts, :repo) || Repo.repo()
     filters = Keyword.get(opts, :filters, [])
 
+    {datetime_range, event_filters} = Keyword.pop(filters, :datetime_range)
+
     Event
-    |> where(^filter_where(filters))
-    |> select([e], count(e.similarity_id, :distinct))
+    |> where(^filter_where(event_filters))
+    |> group_by([e], e.similarity_id)
+    |> having(^last_seen_in_range(datetime_range))
+    |> select([e], e.similarity_id)
+    |> subquery()
+    |> select(count("*"))
     |> repo.one()
   end
 
@@ -72,11 +81,14 @@ defmodule TowerDB.Issues do
         value = List.wrap(value)
         dynamic([e], ^dynamic and e.similarity_id in ^value)
 
-      {:datetime_range, {from, to}}, dynamic ->
-        dynamic([e], ^dynamic and e.datetime >= ^from and e.datetime <= ^to)
-
       {_, _}, dynamic ->
         dynamic
     end)
+  end
+
+  defp last_seen_in_range(nil), do: dynamic(true)
+
+  defp last_seen_in_range({from, to}) do
+    dynamic([e], max(e.datetime) >= ^from and max(e.datetime) <= ^to)
   end
 end
