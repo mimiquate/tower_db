@@ -8,7 +8,12 @@ defmodule TowerDB.Reporter do
 
   @impl true
   def report_event(%Tower.Event{} = event) do
-    do_report_event(event)
+    if TowerDB.Config.enabled?() do
+      do_report_event(event)
+    else
+      Logger.debug("[TowerDB] Reporter disabled, ignoring event")
+      :ok
+    end
   end
 
   defp do_report_event(%Tower.Event{} = event) do

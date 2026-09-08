@@ -8,7 +8,6 @@ A [Tower](https://github.com/mimiquate/tower) reporter that stores errors and ex
 > Features we're waiting on before calling it production ready:
 >
 > - Pruner
-> - Enable / Disable reporter via config var and via remote shell
 > - Performance test
 
 ## Installation
@@ -71,6 +70,21 @@ Run the migration:
 
 ```bash
 mix ecto.migrate
+```
+
+## Configuration
+
+TowerDB is enabled by default. You can disable it via config:
+
+```elixir
+config :tower_db, enabled: false
+```
+
+You can also toggle it at runtime, for example from a remote shell during an incident:
+
+```elixir
+TowerDB.disable()
+TowerDB.enable()
 ```
 
 ## License

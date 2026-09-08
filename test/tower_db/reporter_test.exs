@@ -1,6 +1,8 @@
 defmodule TowerDB.ReporterTest do
   use TowerDB.DataCase, async: false
 
+  import ExUnit.CaptureLog, only: [capture_log: 2]
+
   alias TowerDB.Reporter
 
   describe "report_event/1" do
@@ -69,6 +71,37 @@ defmodule TowerDB.ReporterTest do
       assert db_event.stacktrace == nil
       assert db_event.metadata == nil
     end
+  end
+
+  describe "report_event/1 when disabled" do
+    test "does not persist the event and returns :ok" do
+      put_env(:tower_db, :enabled, false)
+
+      original_level = Logger.level()
+      Logger.configure(level: :debug)
+      on_exit(fn -> Logger.configure(level: original_level) end)
+
+      event = build_tower_event(:error, "Disabled event")
+
+      assert capture_log([level: :debug], fn ->
+               assert Reporter.report_event(event) == :ok
+             end) =~ "[TowerDB] Reporter disabled, ignoring event"
+
+      assert TowerDB.Events.list_events() == []
+    end
+  end
+
+  defp put_env(app, key, value) do
+    original_value = Application.get_env(app, key)
+    Application.put_env(app, key, value)
+
+    on_exit(fn ->
+      if original_value == nil do
+        Application.delete_env(app, key)
+      else
+        Application.put_env(app, key, original_value)
+      end
+    end)
   end
 
   defp build_tower_event(level, message, opts \\ []) do
