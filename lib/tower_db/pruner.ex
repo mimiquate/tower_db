@@ -78,4 +78,29 @@ defmodule TowerDB.Pruner do
     Events.delete_events(ids, repo: repo)
     delete_issue_overage(repo, similarity_id, overage - length(ids))
   end
+
+  defp prune_by_total_size(repo) do
+    case max_size() do
+      :infinity ->
+        :ok
+
+      max_count ->
+        overage = Events.count_events(repo: repo) - max_count
+        delete_total_overage(repo, overage)
+    end
+  end
+
+  defp delete_total_overage(_repo, overage) when overage <= 0, do: :ok
+
+  defp delete_total_overage(repo, overage) do
+    ids =
+      Event
+      |> order_by(asc: :datetime)
+      |> limit(^min(overage, batch_size()))
+      |> select([e], e.id)
+      |> repo.all()
+
+    Events.delete_events(ids, repo: repo)
+    delete_total_overage(repo, overage - length(ids))
+  end
 end
