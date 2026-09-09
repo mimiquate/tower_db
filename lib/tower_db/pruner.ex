@@ -45,4 +45,37 @@ defmodule TowerDB.Pruner do
         delete_older_than(repo, cutoff)
     end
   end
+
+  defp prune_by_issue_size(repo) do
+    case max_size_per_issue() do
+      :infinity -> :ok
+      max_count -> prune_over_limit_issues(repo, max_count)
+    end
+  end
+
+  defp prune_over_limit_issues(repo, max_count) do
+    Event
+    |> group_by([e], e.similarity_id)
+    |> having([e], count(e.id) > ^max_count)
+    |> select([e], {e.similarity_id, count(e.id)})
+    |> repo.all()
+    |> Enum.each(fn {similarity_id, count} ->
+      delete_issue_overage(repo, similarity_id, count - max_count)
+    end)
+  end
+
+  defp delete_issue_overage(_repo, _similarity_id, overage) when overage <= 0, do: :ok
+
+  defp delete_issue_overage(repo, similarity_id, overage) do
+    ids =
+      Event
+      |> where([e], e.similarity_id == ^similarity_id)
+      |> order_by(asc: :datetime)
+      |> limit(^min(overage, batch_size()))
+      |> select([e], e.id)
+      |> repo.all()
+
+    Events.delete_events(ids, repo: repo)
+    delete_issue_overage(repo, similarity_id, overage - length(ids))
+  end
 end
