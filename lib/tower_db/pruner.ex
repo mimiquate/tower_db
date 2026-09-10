@@ -1,6 +1,8 @@
 defmodule TowerDB.Pruner do
   use GenServer
 
+  require Logger
+
   import Ecto.Query
 
   alias TowerDB.Event
@@ -58,59 +60,25 @@ defmodule TowerDB.Pruner do
 
   defp prune_by_age(repo) do
     cutoff = DateTime.add(DateTime.utc_now(), -max_age(), :second)
-    delete_older_than(repo, cutoff)
-  end
-
-  defp delete_older_than(repo, cutoff) do
-    ids =
-      Event
-      |> where([e], e.datetime < ^cutoff)
-      |> order_by(asc: :datetime)
-      |> limit(^batch_size())
-      |> select([e], e.id)
-      |> repo.all()
-
-    case ids do
-      [] ->
-        :ok
-
-      ids ->
-        Events.delete_events(ids, repo: repo)
-        delete_older_than(repo, cutoff)
-    end
+    delete_in_batches(repo, where(Event, [e], e.datetime < ^cutoff))
   end
 
   defp prune_by_issue_size(repo) do
     case max_size_per_issue() do
       :infinity -> :ok
-      max_count -> prune_over_limit_issues(repo, max_count)
+      max_count -> delete_in_batches(repo, over_limit_issue_events(max_count))
     end
   end
 
-  defp prune_over_limit_issues(repo, max_count) do
+  defp over_limit_issue_events(max_count) do
     Event
-    |> group_by([e], e.similarity_id)
-    |> having([e], count(e.id) > ^max_count)
-    |> select([e], {e.similarity_id, count(e.id)})
-    |> repo.all()
-    |> Enum.each(fn {similarity_id, count} ->
-      delete_issue_overage(repo, similarity_id, count - max_count)
-    end)
-  end
-
-  defp delete_issue_overage(_repo, _similarity_id, overage) when overage <= 0, do: :ok
-
-  defp delete_issue_overage(repo, similarity_id, overage) do
-    ids =
-      Event
-      |> where([e], e.similarity_id == ^similarity_id)
-      |> order_by(asc: :datetime)
-      |> limit(^min(overage, batch_size()))
-      |> select([e], e.id)
-      |> repo.all()
-
-    Events.delete_events(ids, repo: repo)
-    delete_issue_overage(repo, similarity_id, overage - length(ids))
+    |> select([e], %{
+      id: e.id,
+      datetime: e.datetime,
+      rank: over(row_number(), partition_by: e.similarity_id, order_by: [desc: e.datetime])
+    })
+    |> subquery()
+    |> where([r], r.rank > ^max_count)
   end
 
   defp prune_by_total_size(repo) do
@@ -120,21 +88,39 @@ defmodule TowerDB.Pruner do
 
       max_count ->
         overage = Events.count_events(repo: repo) - max_count
-        delete_total_overage(repo, overage)
+        delete_in_batches(repo, Event, overage)
     end
   end
 
-  defp delete_total_overage(_repo, overage) when overage <= 0, do: :ok
+  # `remaining` is either `:unbounded` (delete everything matching, e.g. age-based
+  # pruning) or the known number of rows still to delete (size-based pruning),
+  defp delete_in_batches(repo, queryable, remaining \\ :unbounded) do
+    limit =
+      case remaining do
+        :unbounded -> batch_size()
+        n when n <= 0 -> 0
+        n -> min(n, batch_size())
+      end
 
-  defp delete_total_overage(repo, overage) do
     ids =
-      Event
+      queryable
       |> order_by(asc: :datetime)
-      |> limit(^min(overage, batch_size()))
+      |> limit(^limit)
       |> select([e], e.id)
       |> repo.all()
 
-    Events.delete_events(ids, repo: repo)
-    delete_total_overage(repo, overage - length(ids))
+    case ids do
+      [] ->
+        :ok
+
+      ids ->
+        Events.delete_events(ids, repo: repo)
+        Logger.info("TowerDB.Pruner deleted #{length(ids)} event(s)")
+
+        case remaining do
+          :unbounded -> delete_in_batches(repo, queryable, :unbounded)
+          n -> delete_in_batches(repo, queryable, n - length(ids))
+        end
+    end
   end
 end
