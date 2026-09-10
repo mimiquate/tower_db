@@ -88,7 +88,7 @@ defmodule TowerDB.Pruner do
 
       max_count ->
         overage = Events.count_events(repo: repo) - max_count
-        delete_in_batches(repo, Event, overage)
+        if overage > 0, do: delete_in_batches(repo, Event, overage)
     end
   end
 
@@ -98,7 +98,6 @@ defmodule TowerDB.Pruner do
     limit =
       case remaining do
         :unbounded -> batch_size()
-        n when n <= 0 -> 0
         n -> min(n, batch_size())
       end
 
@@ -118,8 +117,14 @@ defmodule TowerDB.Pruner do
         Logger.info("TowerDB.Pruner deleted #{length(ids)} event(s)")
 
         case remaining do
-          :unbounded -> delete_in_batches(repo, queryable, :unbounded)
-          n -> delete_in_batches(repo, queryable, n - length(ids))
+          :unbounded ->
+            delete_in_batches(repo, queryable, :unbounded)
+
+          n ->
+            case n - length(ids) do
+              left when left <= 0 -> :ok
+              left -> delete_in_batches(repo, queryable, left)
+            end
         end
     end
   end
