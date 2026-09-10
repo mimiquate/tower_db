@@ -1,8 +1,11 @@
 defmodule TowerDB.Pruner do
+  use GenServer
+
   import Ecto.Query
 
   alias TowerDB.Event
   alias TowerDB.Events
+  alias TowerDB.Repo
 
   @default_max_age 7_776_000
   @default_max_size 100_000
@@ -21,6 +24,37 @@ defmodule TowerDB.Pruner do
   defp max_size_per_issue, do: config(:max_size_per_issue, @default_max_size_per_issue)
   defp interval, do: config(:interval, @default_interval)
   defp batch_size, do: config(:batch_size, @default_batch_size)
+
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, __MODULE__))
+  end
+
+  @impl true
+  def init(opts) do
+    schedule_next()
+    {:ok, opts}
+  end
+
+  @impl true
+  def handle_info(:prune, opts) do
+    prune(opts)
+    schedule_next()
+    {:noreply, opts}
+  end
+
+  defp schedule_next do
+    Process.send_after(self(), :prune, interval() * 1_000)
+  end
+
+  def prune(opts \\ []) do
+    repo = Keyword.get(opts, :repo) || Repo.repo()
+
+    prune_by_age(repo)
+    prune_by_issue_size(repo)
+    prune_by_total_size(repo)
+
+    :ok
+  end
 
   defp prune_by_age(repo) do
     cutoff = DateTime.add(DateTime.utc_now(), -max_age(), :second)
