@@ -45,10 +45,17 @@ config(
 )
 ```
 
-Configure the Ecto repo that TowerDB will use to store events:
+And configure `:tower_db`.
+
 
 ```elixir
-config :tower_db, repo: MyApp.Repo
+# config/runtime.exs
+
+if config_env() == :prod do
+  config :tower_db,
+    enabled: true,
+    repo: MyApp.Repo
+end
 ```
 
 TowerDB requires database tables to store error events. Generate an Ecto migration:
@@ -80,23 +87,16 @@ Run the migration:
 mix ecto.migrate
 ```
 
-Once you add this reporter, it's enabled by default. You can disable it via config:
-
-```elixir
-# config/runtime.exs
-
-if config_env() == :staging do
-  config :tower_db, enabled: false
-end
-```
-
 ## Reporting
 
-You can also toggle the reporter at runtime, for example from a remote shell during an incident:
+That's it.
+There's no extra source code needed to get reports in your database.
 
-```sh
-$ bin/my_app remote
-```
+Tower will automatically report any errors (exceptions, throws or abnormal exits) occurring in your application.
+That includes errors in any plug call (including Phoenix), Oban jobs, async task or any other Elixir process.
+
+
+You can also enable or disable the reporter at runtime:
 
 ```elixir
 TowerDB.disable()
