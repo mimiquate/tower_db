@@ -280,4 +280,43 @@ defmodule TowerDB.IssuesTest do
       assert Issues.count_issues(filters: [level: :warning]) == 1
     end
   end
+
+  describe "delete_issue/2" do
+    test "deletes all events for the given similarity_id and returns the count" do
+      {:ok, _} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 10:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "first occurrence of error A"}
+        })
+
+      {:ok, _} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 1,
+          datetime: ~U[2026-05-08 11:00:00.000000Z],
+          level: :error,
+          kind: :error,
+          reason: %RuntimeError{message: "second occurrence of error A"}
+        })
+
+      {:ok, kept_event} =
+        Events.create_event(%{
+          id: UUIDv7.generate(),
+          similarity_id: 2,
+          datetime: ~U[2026-05-08 12:00:00.000000Z],
+          level: :warning,
+          kind: :error,
+          reason: %ArgumentError{message: "error B"}
+        })
+
+      assert Issues.delete_issue(1) == {2, nil}
+
+      remaining_ids = Events.list_events() |> Enum.map(& &1.id)
+      assert remaining_ids == [kept_event.id]
+    end
+  end
 end
