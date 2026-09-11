@@ -30,11 +30,19 @@ mix deps.get
 
 ## Setup
 
-Add TowerDB to your Tower reporters:
+Add `TowerDB` to your Tower reporters:
 
 ```elixir
 # config/config.exs
-config :tower, reporters: [TowerDB]
+
+config(
+  :tower,
+  :reporters,
+  [
+    # along any other possible reporters
+    TowerDB
+  ]
+)
 ```
 
 Configure the Ecto repo that TowerDB will use to store events:
@@ -72,15 +80,23 @@ Run the migration:
 mix ecto.migrate
 ```
 
-## Configuration
-
-TowerDB is enabled by default. You can disable it via config:
+Once you add this reporter, it's enabled by default. You can disable it via config:
 
 ```elixir
-config :tower_db, enabled: false
+# config/runtime.exs
+
+if config_env() == :staging do
+  config :tower_db, enabled: false
+end
 ```
 
-You can also toggle it at runtime, for example from a remote shell during an incident:
+## Reporting
+
+You can also toggle the reporter at runtime, for example from a remote shell during an incident:
+
+```sh
+$ bin/my_app remote
+```
 
 ```elixir
 TowerDB.disable()
