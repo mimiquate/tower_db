@@ -74,7 +74,7 @@ defmodule TowerDB.ReporterTest do
   end
 
   describe "report_event/1 when disabled" do
-    test "does not persist the event and returns :ok" do
+    test "does not persist the event, logs it, and returns :ok" do
       put_env(:tower_db, :enabled, false)
 
       original_level = Logger.level()
@@ -88,6 +88,18 @@ defmodule TowerDB.ReporterTest do
              end) =~ "[TowerDB] Reporter disabled, ignoring event"
 
       assert TowerDB.Events.list_events() == []
+    end
+  end
+
+  describe "report_event/1 with an invalid :enabled config" do
+    test "raises an ArgumentError" do
+      put_env(:tower_db, :enabled, "false")
+
+      event = build_tower_event(:error, "Invalid config event")
+
+      assert_raise ArgumentError,
+                   "expected :tower_db, :enabled to be a boolean, got: \"false\"",
+                   fn -> Reporter.report_event(event) end
     end
   end
 
