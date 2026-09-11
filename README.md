@@ -8,7 +8,6 @@ A [Tower](https://github.com/mimiquate/tower) reporter that stores errors and ex
 > Features we're waiting on before calling it production ready:
 >
 > - Pruner
-> - Enable / Disable reporter via config var and via remote shell
 > - Performance test
 
 ## Installation
@@ -31,17 +30,32 @@ mix deps.get
 
 ## Setup
 
-Add TowerDB to your Tower reporters:
+Add `TowerDB` to your Tower reporters:
 
 ```elixir
 # config/config.exs
-config :tower, reporters: [TowerDB]
+
+config(
+  :tower,
+  :reporters,
+  [
+    # along any other possible reporters
+    TowerDB
+  ]
+)
 ```
 
-Configure the Ecto repo that TowerDB will use to store events:
+And configure `:tower_db`.
+
 
 ```elixir
-config :tower_db, repo: MyApp.Repo
+# config/runtime.exs
+
+if config_env() == :prod do
+  config :tower_db,
+    enabled: true,
+    repo: MyApp.Repo
+end
 ```
 
 TowerDB requires database tables to store error events. Generate an Ecto migration:
@@ -71,6 +85,22 @@ Run the migration:
 
 ```bash
 mix ecto.migrate
+```
+
+## Reporting
+
+That's it.
+There's no extra source code needed to get reports in your database.
+
+Tower will automatically report any errors (exceptions, throws or abnormal exits) occurring in your application.
+That includes errors in any plug call (including Phoenix), Oban jobs, async task or any other Elixir process.
+
+
+You can also enable or disable the reporter at runtime:
+
+```elixir
+TowerDB.disable()
+TowerDB.enable()
 ```
 
 ## License
