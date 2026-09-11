@@ -58,6 +58,22 @@ defmodule TowerDB.Issues do
     |> repo.one()
   end
 
+  def delete_issue(id, opts \\ []) do
+    repo = Keyword.get(opts, :repo) || Repo.repo()
+
+    Event
+    |> where([e], e.similarity_id == ^id)
+    |> repo.delete_all()
+  end
+
+  def delete_issues(ids, opts \\ []) when is_list(ids) do
+    repo = Keyword.get(opts, :repo) || Repo.repo()
+
+    Event
+    |> where([e], e.similarity_id in ^ids)
+    |> repo.delete_all()
+  end
+
   defp filter_where(filters) do
     Enum.reduce(filters, dynamic(true), fn
       {:search, value}, dynamic when value != "" ->
