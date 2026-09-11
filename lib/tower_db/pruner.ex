@@ -9,22 +9,31 @@ defmodule TowerDB.Pruner do
   alias TowerDB.Events
   alias TowerDB.Repo
 
-  @default_max_age 7_776_000
+  @default_max_age {90, :days}
   @default_max_size 100_000
   @default_max_size_per_issue 1_000
-  @default_interval 30
+  @default_interval {30, :seconds}
   @default_batch_size 1_000
 
   defp config(key, default) do
     :tower_db
-    |> Application.get_env(:pruner, [])
+    |> Application.get_env(:pruner)
+    |> pruner_opts()
     |> Keyword.get(key, default)
   end
 
-  defp max_age, do: config(:max_age, @default_max_age)
+  defp pruner_opts(opts) when is_list(opts), do: opts
+  defp pruner_opts(_), do: []
+
+  defp to_seconds({amount, :seconds}), do: amount
+  defp to_seconds({amount, :minutes}), do: amount * 60
+  defp to_seconds({amount, :hours}), do: amount * 3_600
+  defp to_seconds({amount, :days}), do: amount * 86_400
+
+  defp max_age, do: config(:max_age, @default_max_age) |> to_seconds()
   defp max_size, do: config(:max_size, @default_max_size)
   defp max_size_per_issue, do: config(:max_size_per_issue, @default_max_size_per_issue)
-  defp interval, do: config(:interval, @default_interval)
+  defp interval, do: config(:interval, @default_interval) |> to_seconds()
   defp batch_size, do: config(:batch_size, @default_batch_size)
 
   def start_link(opts \\ []) do

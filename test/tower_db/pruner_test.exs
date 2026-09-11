@@ -11,10 +11,10 @@ defmodule TowerDB.PrunerTest do
 
   defp configure_pruner(overrides) do
     defaults = [
-      max_age: 999_999_999,
+      max_age: {999_999_999, :seconds},
       max_size: :infinity,
       max_size_per_issue: :infinity,
-      interval: 30,
+      interval: {30, :seconds},
       batch_size: 1_000
     ]
 
@@ -42,7 +42,7 @@ defmodule TowerDB.PrunerTest do
   defp ids_of(events), do: events |> Enum.map(& &1.id) |> Enum.sort()
 
   test "prune/1 deletes events older than max_age and keeps the rest" do
-    configure_pruner(max_age: 100)
+    configure_pruner(max_age: {100, :seconds})
 
     now = DateTime.utc_now()
     old = insert_event(datetime: DateTime.add(now, -200, :second))
@@ -91,7 +91,7 @@ defmodule TowerDB.PrunerTest do
   end
 
   test "start_link/1 schedules pruning and the timer triggers it" do
-    configure_pruner(max_age: 100, interval: 0)
+    configure_pruner(max_age: {100, :seconds}, interval: {0, :seconds})
 
     old = insert_event(datetime: DateTime.add(DateTime.utc_now(), -200, :second))
 
