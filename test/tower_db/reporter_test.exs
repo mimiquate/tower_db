@@ -55,6 +55,36 @@ defmodule TowerDB.ReporterTest do
       assert db_event.metadata == metadata
     end
 
+    test "attaches request_data when plug_conn is present" do
+      conn =
+        Plug.Test.conn(:get, "/users/1")
+        |> Map.put(:host, "example.com")
+        |> Map.put(:port, 80)
+        |> Map.put(:scheme, :http)
+        |> Map.put(:remote_ip, {127, 0, 0, 1})
+        |> Plug.Conn.put_req_header("user-agent", "ExampleBrowser/1.0")
+
+      event = build_tower_event(:error, "With conn", plug_conn: conn)
+
+      Reporter.report_event(event)
+
+      [db_event] = TowerDB.Events.list_events()
+
+      assert db_event.request_data["url"] == "http://example.com:80/users/1"
+      assert db_event.request_data["method"] == "GET"
+      assert db_event.request_data["headers"] == %{"user-agent" => "ExampleBrowser/1.0"}
+    end
+
+    test "leaves request_data nil when plug_conn is absent" do
+      event = build_tower_event(:error, "No conn")
+
+      Reporter.report_event(event)
+
+      [db_event] = TowerDB.Events.list_events()
+
+      assert db_event.request_data == nil
+    end
+
     test "handles events with nil optional fields" do
       event =
         build_tower_event(:error, "Nil fields",
@@ -83,7 +113,7 @@ defmodule TowerDB.ReporterTest do
         Keyword.get(opts, :stacktrace, [{__MODULE__, :test, 0, [file: ~c"test.ex", line: 1]}]),
       metadata: Keyword.get(opts, :metadata, %{}),
       log_event: nil,
-      plug_conn: nil,
+      plug_conn: Keyword.get(opts, :plug_conn),
       by: nil
     }
   end

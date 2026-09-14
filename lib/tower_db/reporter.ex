@@ -20,7 +20,8 @@ defmodule TowerDB.Reporter do
       kind: event.kind,
       reason: event.reason,
       stacktrace: event.stacktrace,
-      metadata: event.metadata
+      metadata: event.metadata,
+      request_data: request_data(event.plug_conn)
     }
 
     case TowerDB.Events.create_event(attrs) do
@@ -31,4 +32,7 @@ defmodule TowerDB.Reporter do
         nil
     end
   end
+
+  defp request_data(%Plug.Conn{} = conn), do: TowerDB.RequestData.build(conn)
+  defp request_data(_), do: nil
 end
