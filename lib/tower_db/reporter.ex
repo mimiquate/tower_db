@@ -8,7 +8,26 @@ defmodule TowerDB.Reporter do
 
   @impl true
   def report_event(%Tower.Event{} = event) do
-    do_report_event(event)
+    if enabled?() do
+      do_report_event(event)
+    else
+      Logger.debug("[TowerDB] Reporter disabled, ignoring event")
+      :ok
+    end
+  end
+
+  defp enabled? do
+    case Application.fetch_env(:tower_db, :enabled) do
+      {:ok, enabled} when is_boolean(enabled) ->
+        enabled
+
+      {:ok, other} ->
+        raise ArgumentError,
+              "expected :tower_db, :enabled to be a boolean, got: #{inspect(other)}"
+
+      :error ->
+        true
+    end
   end
 
   defp do_report_event(%Tower.Event{} = event) do
