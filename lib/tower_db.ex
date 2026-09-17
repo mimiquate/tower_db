@@ -11,4 +11,12 @@ defmodule TowerDB do
 
   @impl true
   defdelegate report_event(event), to: TowerDB.Reporter
+
+  def enable do
+    Application.put_env(:tower_db, :enabled, true)
+  end
+
+  def disable do
+    Application.put_env(:tower_db, :enabled, false)
+  end
 end
