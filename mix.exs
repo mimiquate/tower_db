@@ -32,7 +32,8 @@ defmodule TowerDB.MixProject do
       {:ecto_sql, "~> 3.12"},
       {:postgrex, "~> 0.17"},
       {:uuid_v7, "~> 0.6"},
-      {:plug, "~> 1.14"}
+      {:plug, "~> 1.14"},
+      {:jason, "~> 1.4"}
     ]
   end
 

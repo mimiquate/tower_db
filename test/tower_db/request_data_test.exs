@@ -6,10 +6,7 @@ defmodule TowerDB.RequestDataTest do
   describe "build/1" do
     test "extracts url without query string, method, and user_ip" do
       conn =
-        Plug.Test.conn(:get, "/users/1?foo=bar")
-        |> Map.put(:host, "example.com")
-        |> Map.put(:port, 80)
-        |> Map.put(:scheme, :http)
+        Plug.Test.conn(:get, "http://example.com/users/1?foo=bar")
         |> Map.put(:remote_ip, {127, 0, 0, 1})
 
       request_data = RequestData.build(conn)
@@ -52,65 +49,33 @@ defmodule TowerDB.RequestDataTest do
              }
     end
 
-    test "filters denylisted param keys, case-insensitively" do
+    test "filters denylisted params (exact, substring, nested) and headers, case-insensitively" do
       conn =
         Plug.Test.conn(:post, "/login", %{
           "email" => "user@example.com",
           "PASSWORD" => "hunter2",
-          "token" => "abc123"
+          "token" => "abc123",
+          "user_password" => "hunter3",
+          "old_password" => "hunter4",
+          "user" => %{"name" => "Jane", "password" => "hunter5"}
         })
         |> Plug.Conn.fetch_query_params()
+        |> Plug.Conn.put_req_header("user-agent", "ExampleBrowser/1.0")
+        |> Plug.Conn.put_req_header("cookie", "session=abc123")
 
       request_data = RequestData.build(conn)
 
       assert request_data["params"] == %{
                "email" => "user@example.com",
                "PASSWORD" => "[FILTERED]",
-               "token" => "[FILTERED]"
-             }
-    end
-
-    test "filters param keys that contain a denylisted substring" do
-      conn =
-        Plug.Test.conn(:post, "/users", %{
-          "user_password" => "hunter2",
-          "old_password" => "hunter1",
-          "email" => "user@example.com"
-        })
-        |> Plug.Conn.fetch_query_params()
-
-      request_data = RequestData.build(conn)
-
-      assert request_data["params"] == %{
+               "token" => "[FILTERED]",
                "user_password" => "[FILTERED]",
                "old_password" => "[FILTERED]",
-               "email" => "user@example.com"
-             }
-    end
-
-    test "filters denylisted keys inside nested params" do
-      conn =
-        Plug.Test.conn(:post, "/users", %{
-          "user" => %{"name" => "Jane", "password" => "hunter2"}
-        })
-        |> Plug.Conn.fetch_query_params()
-
-      request_data = RequestData.build(conn)
-
-      assert request_data["params"] == %{
                "user" => %{"name" => "Jane", "password" => "[FILTERED]"}
              }
-    end
-
-    test "filters denylisted headers within the allowlist" do
-      conn =
-        Plug.Test.conn(:get, "/users")
-        |> Plug.Conn.put_req_header("user-agent", "ExampleBrowser/1.0")
-        |> Plug.Conn.put_req_header("cookie", "session=abc123")
-
-      request_data = RequestData.build(conn)
 
       assert request_data["headers"] == %{
+               "content-type" => "multipart/mixed; boundary=plug_conn_test",
                "user-agent" => "ExampleBrowser/1.0",
                "cookie" => "[FILTERED]"
              }

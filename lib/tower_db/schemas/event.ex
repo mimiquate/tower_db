@@ -18,7 +18,7 @@ defmodule TowerDB.Event do
     field(:normalized_reason, :string)
     field(:stacktrace, TowerDB.Types.Term)
     field(:metadata, TowerDB.Types.Term)
-    field(:request_data, TowerDB.Types.Term)
+    field(:request_data, :map)
 
     timestamps(type: :utc_datetime_usec)
   end

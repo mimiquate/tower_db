@@ -5,7 +5,7 @@ defmodule TowerDB.Migration.V08 do
 
   def up do
     alter table(:tower_db_events) do
-      add(:request_data, :binary)
+      add(:request_data, :map)
     end
   end
 

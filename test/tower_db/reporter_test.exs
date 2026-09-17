@@ -57,10 +57,7 @@ defmodule TowerDB.ReporterTest do
 
     test "attaches request_data when plug_conn is present" do
       conn =
-        Plug.Test.conn(:get, "/users/1")
-        |> Map.put(:host, "example.com")
-        |> Map.put(:port, 80)
-        |> Map.put(:scheme, :http)
+        Plug.Test.conn(:get, "http://example.com/users/1")
         |> Map.put(:remote_ip, {127, 0, 0, 1})
         |> Plug.Conn.put_req_header("user-agent", "ExampleBrowser/1.0")
 
