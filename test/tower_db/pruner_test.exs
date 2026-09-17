@@ -4,23 +4,6 @@ defmodule TowerDB.PrunerTest do
   alias TowerDB.Events
   alias TowerDB.Pruner
 
-  setup do
-    on_exit(fn -> Application.delete_env(:tower_db, :pruner) end)
-    :ok
-  end
-
-  defp configure_pruner(overrides) do
-    defaults = [
-      max_age: {999_999_999, :seconds},
-      max_size: :infinity,
-      max_size_per_issue: :infinity,
-      interval: {30, :seconds},
-      batch_size: 1_000
-    ]
-
-    Application.put_env(:tower_db, :pruner, Keyword.merge(defaults, overrides))
-  end
-
   defp insert_event(overrides) do
     attrs =
       Map.merge(
@@ -41,22 +24,31 @@ defmodule TowerDB.PrunerTest do
 
   defp ids_of(events), do: events |> Enum.map(& &1.id) |> Enum.sort()
 
-  test "prune/1 deletes events older than max_age and keeps the rest" do
-    configure_pruner(max_age: {100, :seconds})
+  # Starts the pruner with a long interval so its timer never fires on its own,
+  # then triggers a single prune cycle synchronously: `:sys.get_state/1` only
+  # replies once every message queued ahead of it - including our `:prune` -
+  # has been handled.
+  defp prune(opts) do
+    {:ok, pid} = Pruner.start_link(Keyword.put_new(opts, :interval, {999_999, :seconds}))
+    on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
 
+    send(pid, :prune)
+    :sys.get_state(pid)
+    :ok
+  end
+
+  test "deletes events older than max_age and keeps the rest" do
     now = DateTime.utc_now()
     old = insert_event(datetime: DateTime.add(now, -200, :second))
     recent = insert_event(datetime: DateTime.add(now, -10, :second))
 
-    Pruner.prune()
+    prune(max_age: {100, :seconds})
 
     assert ids_of(Events.list_events(limit: 100)) == ids_of([recent])
     refute old.id in ids_of(Events.list_events(limit: 100))
   end
 
-  test "prune/1 keeps only the newest max_size_per_issue events per issue" do
-    configure_pruner(max_size_per_issue: 2)
-
+  test "keeps only the newest max_size_per_issue events per issue" do
     now = DateTime.utc_now()
 
     e1 = insert_event(similarity_id: 1, datetime: DateTime.add(now, -300, :second))
@@ -65,7 +57,7 @@ defmodule TowerDB.PrunerTest do
     e4 = insert_event(similarity_id: 1, datetime: now)
     other = insert_event(similarity_id: 2, datetime: DateTime.add(now, -500, :second))
 
-    Pruner.prune()
+    prune(max_size_per_issue: 2, max_age: {999_999_999, :seconds})
 
     remaining = ids_of(Events.list_events(limit: 100))
     assert remaining == ids_of([e3, e4, other])
@@ -73,9 +65,7 @@ defmodule TowerDB.PrunerTest do
     refute e2.id in remaining
   end
 
-  test "prune/1 keeps only the newest max_size events overall, batching the deletes" do
-    configure_pruner(max_size: 2, batch_size: 2)
-
+  test "keeps only the newest max_size events overall, batching the deletes" do
     now = DateTime.utc_now()
 
     events =
@@ -85,21 +75,8 @@ defmodule TowerDB.PrunerTest do
 
     kept = Enum.take(events, -2)
 
-    Pruner.prune()
+    prune(max_size: 2, batch_size: 2, max_age: {999_999_999, :seconds})
 
     assert ids_of(Events.list_events(limit: 100)) == ids_of(kept)
-  end
-
-  test "start_link/1 schedules pruning and the timer triggers it" do
-    configure_pruner(max_age: {100, :seconds}, interval: {0, :seconds})
-
-    old = insert_event(datetime: DateTime.add(DateTime.utc_now(), -200, :second))
-
-    {:ok, pid} = Pruner.start_link()
-    on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
-
-    Process.sleep(50)
-
-    refute old.id in ids_of(Events.list_events(limit: 100))
   end
 end
