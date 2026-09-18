@@ -7,7 +7,6 @@ A [Tower](https://github.com/mimiquate/tower) reporter that stores errors and ex
 >
 > Features we're waiting on before calling it production ready:
 >
-> - Pruner
 > - Performance test
 
 ## Installation
@@ -102,6 +101,43 @@ You can also enable or disable the reporter at runtime:
 TowerDB.disable()
 TowerDB.enable()
 ```
+
+## Pruner
+
+TowerDB can automatically delete old or excess events so storage stays bounded. It's enabled by default with the settings below; configure `:pruner` under `:tower_db` to change that:
+
+```elixir
+# config/config.exs
+
+# enabled with defaults (same as not setting :pruner at all)
+config :tower_db, pruner: []
+
+# enabled, overriding only the settings you name (the rest keep their defaults)
+config :tower_db, pruner: [max_age: {30, :days}]
+
+# disabled entirely
+config :tower_db, pruner: false
+```
+
+Available settings, all optional:
+
+| key                   | meaning                                   | default            |
+| --------------------- | ------------------------------------------ | ------------------- |
+| `max_age`             | how long an event is kept before deletion  | `{90, :days}`        |
+| `max_size`            | total events kept across all issues        | `100_000`            |
+| `max_size_per_issue`  | events kept per issue                      | `1_000`              |
+| `interval`            | time between prune runs                    | `{30, :seconds}`     |
+| `batch_size`          | max rows deleted per batch                 | `1_000`              |
+
+`max_age` and `interval` are `{amount, unit}` tuples, with `unit` one of `:seconds`, `:minutes`, `:hours`, or `:days`.
+
+`max_size` and `max_size_per_issue` accept `:infinity` to disable that specific check.
+
+Each prune run deletes, in batches of `batch_size`:
+
+1. events older than `max_age`;
+2. for each issue, the oldest events beyond `max_size_per_issue` (unless `:infinity`);
+3. the oldest events beyond `max_size` overall (unless `:infinity`).
 
 ## License
 
