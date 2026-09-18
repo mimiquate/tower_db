@@ -8,8 +8,7 @@ defmodule TowerDB.Pruner do
   alias TowerDB.Repo
   alias __MODULE__, as: State
 
-  defstruct timer: nil,
-            repo: nil,
+  defstruct repo: nil,
             max_age: {90, :days},
             max_size: 100_000,
             max_size_per_issue: 1_000,
@@ -47,15 +46,9 @@ defmodule TowerDB.Pruner do
     {:noreply, state}
   end
 
-  @impl true
-  def terminate(_reason, state) do
-    if is_reference(state.timer), do: Process.cancel_timer(state.timer)
-
-    :ok
-  end
-
   defp schedule_prune(state) do
-    %{state | timer: Process.send_after(self(), :prune, state.interval)}
+    Process.send_after(self(), :prune, state.interval)
+    state
   end
 
   defp to_seconds({amount, :seconds}), do: amount
@@ -88,48 +81,33 @@ defmodule TowerDB.Pruner do
 
   defp prune_by_total_size(state) do
     case state.max_size do
-      :infinity ->
-        :ok
-
-      max_count ->
-        overage = Events.count_events(repo: state.repo) - max_count
-        if overage > 0, do: delete_in_batches(state, Event, overage), else: :ok
+      :infinity -> :ok
+      max_count -> delete_in_batches(state, over_limit_events(max_count))
     end
   end
 
-  # `remaining` is either `:unbounded` (delete everything matching, e.g. age-based
-  # pruning) or the known number of rows still to delete (size-based pruning),
-  defp delete_in_batches(state, queryable, remaining \\ :unbounded) do
-    limit =
-      case remaining do
-        :unbounded -> state.batch_size
-        n -> min(n, state.batch_size)
-      end
+  defp over_limit_events(max_count) do
+    Event
+    |> select([e], %{
+      id: e.id,
+      datetime: e.datetime,
+      rank: over(row_number(), order_by: [desc: e.datetime])
+    })
+    |> subquery()
+    |> where([r], r.rank > ^max_count)
+  end
 
+  defp delete_in_batches(state, queryable) do
     ids =
       queryable
       |> order_by(asc: :datetime)
-      |> limit(^limit)
+      |> limit(^state.batch_size)
       |> select([e], e.id)
       |> state.repo.all()
 
-    case ids do
-      [] ->
-        :ok
-
-      ids ->
-        Events.delete_events(ids, repo: state.repo)
-
-        case remaining do
-          :unbounded ->
-            delete_in_batches(state, queryable, :unbounded)
-
-          n ->
-            case n - length(ids) do
-              left when left <= 0 -> :ok
-              left -> delete_in_batches(state, queryable, left)
-            end
-        end
+    case Events.delete_events(ids, repo: state.repo) do
+      {0, nil} -> :ok
+      {_count, nil} -> delete_in_batches(state, queryable)
     end
   end
 end
