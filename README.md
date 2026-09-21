@@ -135,7 +135,7 @@ Available settings, all optional:
 
 Each prune run deletes, in batches of `batch_size`:
 
-1. events older than `max_age`;
+1. events older than `max_age` (unless `:infinity`);
 2. for each issue, the oldest events beyond `max_size_per_issue` (unless `:infinity`);
 3. the oldest events beyond `max_size` overall (unless `:infinity`).
 
