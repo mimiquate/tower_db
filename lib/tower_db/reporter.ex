@@ -43,7 +43,7 @@ defmodule TowerDB.Reporter do
       request_data: request_data(event.plug_conn)
     }
 
-    case TowerDB.Events.create_event(attrs) do
+    case TowerDB.BurstProtector.add(attrs) do
       {:error, reason} ->
         Logger.error("[TowerDB] Error creating event in DB: #{inspect(reason)}")
 
