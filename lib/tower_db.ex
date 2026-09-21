@@ -27,4 +27,12 @@ defmodule TowerDB do
               "(for example, Elixir's built-in JSON on Elixir 1.18+) with " <>
               "`config :postgrex, :json_library, YourLibraryOfChoice`"
   end
+
+  def enable do
+    Application.put_env(:tower_db, :enabled, true)
+  end
+
+  def disable do
+    Application.put_env(:tower_db, :enabled, false)
+  end
 end
