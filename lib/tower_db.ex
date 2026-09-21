@@ -12,20 +12,19 @@ defmodule TowerDB do
   @impl true
   defdelegate report_event(event), to: TowerDB.Reporter
 
-  configured_json_library = Application.compile_env(:postgrex, :json_library)
+  postgrex_json_library = Application.compile_env(:postgrex, :json_library)
 
   cond do
-    configured_json_library && Code.ensure_loaded?(configured_json_library) ->
-      def json_module, do: unquote(configured_json_library)
-
-    is_nil(configured_json_library) && Code.ensure_loaded?(Jason) ->
-      def json_module, do: Jason
+    postgrex_json_library == Jason && not Code.ensure_loaded?(Jason) ->
+      raise """
+      TowerDB uses map columns, postgrex uses Jason by default.
+        Include the jason package in your dependencies, or configure one explicitly
+        config :postgrex, :json_library, JSON
+        Elixir's built-in JSON on Elixir 1.18+
+      """
 
     true ->
-      raise "Postgrex needs a JSON library to persist tower_db's jsonb columns. " <>
-              "Include the jason package in your dependencies, or configure one explicitly " <>
-              "(for example, Elixir's built-in JSON on Elixir 1.18+) with " <>
-              "`config :postgrex, :json_library, YourLibraryOfChoice`"
+      :ok
   end
 
   def enable do
