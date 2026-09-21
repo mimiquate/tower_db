@@ -33,7 +33,7 @@ defmodule TowerDB.MixProject do
       {:postgrex, "~> 0.17"},
       {:uuid_v7, "~> 0.6"},
       {:plug, "~> 1.14"},
-      {:jason, "~> 1.4"}
+      {:jason, "~> 1.4", optional: true}
     ]
   end
 
