@@ -17,6 +17,7 @@ config :tower_db, TowerDB.PartialUpgradeTestRepo,
 config :tower_db,
   repo: TowerDB.TestRepo,
   ecto_repos: [TowerDB.TestRepo, TowerDB.PartialUpgradeTestRepo],
-  pruner: false
+  pruner: false,
+  burst_protection: [interval: 999_999]
 
 config :logger, level: :warning
