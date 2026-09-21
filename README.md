@@ -131,7 +131,7 @@ Available settings, all optional:
 
 `max_age` and `interval` are `{amount, unit}` tuples, with `unit` one of `:seconds`, `:minutes`, `:hours`, or `:days`.
 
-`max_size` and `max_size_per_issue` accept `:infinity` to disable that specific check.
+`max_age`, `max_size` and `max_size_per_issue` accept `:infinity` to disable that specific check.
 
 Each prune run deletes, in batches of `batch_size`:
 
