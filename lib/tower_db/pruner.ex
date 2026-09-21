@@ -51,22 +51,23 @@ defmodule TowerDB.Pruner do
     state
   end
 
+  defp to_seconds(:infinity), do: :infinity
   defp to_seconds({amount, :seconds}), do: amount
   defp to_seconds({amount, :minutes}), do: amount * 60
   defp to_seconds({amount, :hours}), do: amount * 3_600
   defp to_seconds({amount, :days}), do: amount * 86_400
+
+  defp prune_by_age(%State{max_age: :infinity}), do: :ok
 
   defp prune_by_age(state) do
     cutoff = DateTime.add(DateTime.utc_now(), -state.max_age, :second)
     delete_in_batches(state, where(Event, [e], e.datetime < ^cutoff))
   end
 
-  defp prune_by_issue_size(state) do
-    case state.max_size_per_issue do
-      :infinity -> :ok
-      max_count -> delete_in_batches(state, over_limit_issue_events(max_count))
-    end
-  end
+  defp prune_by_issue_size(%State{max_size_per_issue: :infinity}), do: :ok
+
+  defp prune_by_issue_size(state),
+    do: delete_in_batches(state, over_limit_issue_events(state.max_size_per_issue))
 
   defp over_limit_issue_events(max_count) do
     Event
@@ -79,12 +80,8 @@ defmodule TowerDB.Pruner do
     |> where([r], r.rank > ^max_count)
   end
 
-  defp prune_by_total_size(state) do
-    case state.max_size do
-      :infinity -> :ok
-      max_count -> delete_in_batches(state, over_limit_events(max_count))
-    end
-  end
+  defp prune_by_total_size(%State{max_size: :infinity}), do: :ok
+  defp prune_by_total_size(state), do: delete_in_batches(state, over_limit_events(state.max_size))
 
   defp over_limit_events(max_count) do
     Event
