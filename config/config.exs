@@ -16,6 +16,7 @@ config :tower_db, TowerDB.PartialUpgradeTestRepo,
 
 config :tower_db,
   repo: TowerDB.TestRepo,
-  ecto_repos: [TowerDB.TestRepo, TowerDB.PartialUpgradeTestRepo]
+  ecto_repos: [TowerDB.TestRepo, TowerDB.PartialUpgradeTestRepo],
+  pruner: false
 
 config :logger, level: :warning
