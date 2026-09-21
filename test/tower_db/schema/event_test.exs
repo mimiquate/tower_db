@@ -24,6 +24,29 @@ defmodule TowerDB.EventTest do
       assert changeset.changes.similarity_id == 12345
     end
 
+    test "accepts request_data" do
+      attrs = %{
+        id: UUIDv7.generate(),
+        similarity_id: 12345,
+        datetime: ~U[2026-04-16 12:00:00.000000Z],
+        level: :error,
+        kind: :error,
+        reason: %{message: "Something went wrong"},
+        request_data: %{
+          "url" => "http://example.com/path",
+          "method" => "GET",
+          "user_ip" => "127.0.0.1",
+          "headers" => %{"user-agent" => "test"},
+          "params" => %{"id" => "1"}
+        }
+      }
+
+      changeset = Event.changeset(%Event{}, attrs)
+
+      assert changeset.valid?
+      assert changeset.changes.request_data == attrs.request_data
+    end
+
     test "invalid without required fields" do
       changeset = Event.changeset(%Event{}, %{})
 
