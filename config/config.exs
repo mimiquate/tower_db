@@ -19,4 +19,4 @@ config :tower_db,
   ecto_repos: [TowerDB.TestRepo, TowerDB.PartialUpgradeTestRepo],
   pruner: false
 
-config :logger, level: :error
+config :logger, level: :warning
