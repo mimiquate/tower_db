@@ -49,6 +49,9 @@ defmodule TowerDB.Reporter do
 
       {:ok, _event} ->
         nil
+
+      :dropped ->
+        nil
     end
   end
 
