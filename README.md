@@ -139,6 +139,25 @@ Each prune run deletes, in batches of `batch_size`:
 2. for each issue, the oldest events beyond `max_size_per_issue` (unless `:infinity`);
 3. the oldest events beyond `max_size` overall (unless `:infinity`).
 
+## Burst protection
+
+TowerDB drops events once a configured rate is exceeded, protecting storage and the database from sudden error storms (e.g. a crash loop). It's always on; configure `:burst_protection` under `:tower_db` to change its settings:
+
+```elixir
+# config/config.exs
+
+config :tower_db, burst_protection: [max_count: 500, interval: 30]
+```
+
+Available settings, all optional:
+
+| key         | meaning                                    | default |
+| ----------- | -------------------------------------------- | ------- |
+| `max_count` | events allowed per window before dropping    | `100`   |
+| `interval`  | length of each window, in seconds            | `10`    |
+
+Events beyond `max_count` are dropped until the window resets every `interval` seconds. A summary of dropped events, if any, is logged on reset.
+
 ## License
 
 See [LICENSE](LICENSE).
