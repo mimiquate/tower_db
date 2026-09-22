@@ -10,12 +10,15 @@ defmodule TowerDB.BurstProtector do
 
   use GenServer
 
+  require Logger
+
   alias TowerDB.Events
   alias __MODULE__, as: State
 
   defstruct max_count: 100,
             interval: 10,
-            count: 0
+            count: 0,
+            dropped: 0
 
   @doc """
   Creates the event through `TowerDB.Events.create_event/1` and counts it
@@ -45,12 +48,22 @@ defmodule TowerDB.BurstProtector do
   end
 
   def handle_call({:add, _attrs}, _from, state) do
-    {:reply, :dropped, state}
+    if state.dropped == 0 do
+      Logger.warning("[BurstProtection] max_count reached, dropping events.")
+    end
+
+    {:reply, :dropped, %{state | dropped: state.dropped + 1}}
   end
 
   @impl true
   def handle_info(:reset, state) do
-    {:noreply, schedule_reset(%{state | count: 0})}
+    if state.dropped > 0 do
+      Logger.warning(
+        "[BurstProtection] #{state.dropped} events were dropped. Burst protection deactivated."
+      )
+    end
+
+    {:noreply, schedule_reset(%{state | count: 0, dropped: 0})}
   end
 
   def handle_info(_message, state) do
